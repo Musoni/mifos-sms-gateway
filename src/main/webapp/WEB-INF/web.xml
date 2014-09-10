@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://java.sun.com/xml/ns/javaee" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd" id="mifos-sms-gateway" version="3.0">
+  	<display-name>Mifos SMS Gateway</display-name>
+  	
+  	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>classpath*:META-INF/spring/applicationContext.xml</param-value>
+	</context-param>
+	
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+	
+  	<servlet>
+    	<servlet-name>jersey-serlvet</servlet-name>
+    	<servlet-class>
+    		com.sun.jersey.spi.spring.container.servlet.SpringServlet
+    	</servlet-class>
+    	<init-param>
+			<param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
+			<param-value>true</param-value>
+		</init-param>
+   		<load-on-startup>1</load-on-startup>
+  	</servlet>
+  
+  	<servlet-mapping>
+    	<servlet-name>jersey-serlvet</servlet-name>
+    	<url-pattern>/api/v1/*</url-pattern>
+  	</servlet-mapping>
+  	
+  	<!-- Define roles --> 
+	<security-role> 
+		<role-name>mifos</role-name> 
+    </security-role> 
+  
+	<!-- Define a constraint to restrict access to all resources (/*) --> 
+  	<security-constraint>
+		<web-resource-collection>
+			<web-resource-name>All Access</web-resource-name>
+			<url-pattern>/*</url-pattern>
+			<http-method>DELETE</http-method>
+			<http-method>PUT</http-method>
+			<http-method>HEAD</http-method>
+			<http-method>OPTIONS</http-method>
+			<http-method>TRACE</http-method>
+			<http-method>GET</http-method>
+			<http-method>POST</http-method>
+		</web-resource-collection>
+		<auth-constraint>
+			<role-name>mifos</role-name>
+		</auth-constraint>
+		<user-data-constraint>
+			<transport-guarantee>NONE</transport-guarantee>
+		</user-data-constraint>
+	</security-constraint>
+
+	<!-- This application uses BASIC authentication -->
+	<login-config>
+		<auth-method>BASIC</auth-method>
+	</login-config>
+</web-app>
