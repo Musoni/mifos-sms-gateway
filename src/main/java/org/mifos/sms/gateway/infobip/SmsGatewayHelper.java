@@ -58,6 +58,7 @@ public class SmsGatewayHelper {
 	public Boolean isConnected = false;
 	public Boolean isReconnecting = false;
 	public SmsGatewayConfiguration smsGatewayConfiguration;
+	public Boolean reconnect = true;
     
     @Autowired
     public SmsGatewayHelper(ReadConfigurationService readConfigurationService) {
@@ -380,7 +381,7 @@ public class SmsGatewayHelper {
      * @return void
      */
     public void reconnectAndBindSession() {
-    	if(!isReconnecting) {
+    	if(!isReconnecting && reconnect) {
     		new Thread() {
                 @Override
                 public void run() {
@@ -423,8 +424,7 @@ public class SmsGatewayHelper {
      **/
     private class SessionStateListenerImpl implements SessionStateListener {
         
-    	@SuppressWarnings("unused")
-		@Override
+    	@Override
 		public void onStateChange(SessionState newState, SessionState oldState, Object source) {
             
         	if (newState.equals(SessionState.CLOSED)) {
@@ -496,14 +496,12 @@ public class SmsGatewayHelper {
             }
         }
         
-        @SuppressWarnings("unused")
-		@Override
+        @Override
 		public DataSmResult onAcceptDataSm(DataSm dataSm, Session source) throws ProcessRequestException {
             return null;
         }
         
-        @SuppressWarnings("unused")
-		@Override
+        @Override
 		public void onAcceptAlertNotification(AlertNotification alertNotification) {}
     }
 }
