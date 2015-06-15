@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 
 import javax.ws.rs.Consumes;
-import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -13,9 +12,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.mifos.sms.data.DeliveryReportRequestData;
-import org.mifos.sms.domain.ConfigurationRepository;
 import org.mifos.sms.domain.SmsOutboundMessage;
-import org.mifos.sms.domain.SmsOutboundMessageRepository;
 import org.mifos.sms.helper.HelperClass.ApiResponse;
 import org.mifos.sms.helper.HelperClass.JsonConverter;
 import org.mifos.sms.helper.HttpResponseStatusCode;
@@ -39,18 +36,12 @@ public class SmsApiResource {
 	private final WriteSmsOutboundMessageService writeSmsOutboundMessageService;
 	private final ReadSmsOutboundMessageService readSmsOutboundMessageService;
 	private static final Logger logger = LoggerFactory.getLogger(SmsApiResource.class);
-	private final ConfigurationRepository configurationRepository;
-	private final SmsOutboundMessageRepository smsOutboundMessageRepository;
 	
 	@Autowired
 	public SmsApiResource(final WriteSmsOutboundMessageService writeSmsOutboundMessageService, 
-			final ReadSmsOutboundMessageService readSmsOutboundMessageService, 
-			final ConfigurationRepository configurationRepository, 
-			final SmsOutboundMessageRepository smsOutboundMessageRepository) {
+			final ReadSmsOutboundMessageService readSmsOutboundMessageService) {
 		this.writeSmsOutboundMessageService = writeSmsOutboundMessageService;
 		this.readSmsOutboundMessageService = readSmsOutboundMessageService;
-		this.configurationRepository = configurationRepository;
-		this.smsOutboundMessageRepository = smsOutboundMessageRepository;
 	}
 	
 	@POST
@@ -130,20 +121,5 @@ public class SmsApiResource {
 		}
 		
 		return response;
-	}
-	
-	@GET
-	@Path("/get")
-	public Response get() {
-	    List<Long> idList = new ArrayList<>();
-	    idList.add(1L);
-	    idList.add(2L);
-	    idList.add(3L);
-	    idList.add(4L);
-	    idList.add(5L);
-	    
-	    logger.info("ArrayList.size(): " + idList.size());
-	    
-	    return ApiResponse.success(readSmsOutboundMessageService.findAll(idList, "internaldemo"));
 	}
 }
