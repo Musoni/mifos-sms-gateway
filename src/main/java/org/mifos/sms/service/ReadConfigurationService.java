@@ -16,7 +16,7 @@ public interface ReadConfigurationService {
 	 * 
 	 * @return collection of ConfigurationData objects
 	 **/
-	public Collection<ConfigurationData> getAll();
+	public Collection<ConfigurationData> findAll();
 	
 	/**
 	 * get ConfigurationData object with name matching the one provided
@@ -24,5 +24,5 @@ public interface ReadConfigurationService {
 	 * @param name the name of the configuration
 	 * @return ConfigurationData object 
 	 **/
-	public ConfigurationData get(String name);
+	public ConfigurationData findOne(String name);
 }

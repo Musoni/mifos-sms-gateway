@@ -8,6 +8,9 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.joda.time.LocalDate;
+import org.mifos.sms.data.EnumOptionData;
+import org.mifos.sms.data.SmsOutboundMessageData;
 import org.springframework.data.jpa.domain.AbstractPersistable;
 
 /** 
@@ -19,7 +22,9 @@ import org.springframework.data.jpa.domain.AbstractPersistable;
 @Table(name = "smsOutboundMessage")
 public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	
-	@Column(name = "externalId", nullable = true)
+	private static final long serialVersionUID = -1934303270279746623L;
+
+    @Column(name = "externalId", nullable = true)
     private String externalId;
 	
 	@Column(name = "internalId", nullable = false)
@@ -165,8 +170,8 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	/** 
 	 * @return the date the message was added to the local sms table 
 	 **/
-	public Date getAddedOnDate() {
-		return addedOnDate;
+	public LocalDate getAddedOnDate() {
+		return new LocalDate(this.addedOnDate);
 	}
 	
 	/** 
@@ -179,8 +184,8 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	/** 
 	 * @return the date the message was delivered to the recipient phone 
 	 **/
-	public Date getDeliveredOnDate() {
-		return deliveredOnDate;
+	public LocalDate getDeliveredOnDate() {
+	    return new LocalDate(this.deliveredOnDate);
 	}
 	
 	/** 
@@ -246,16 +251,28 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	}
 	
 	/** 
-	 * Human readable representation of the SmsOutboundMessage class 
+	 * convert SmsOutboundMessage to SmsOutboundMessageData
 	 * 
-	 * @return string representation of the SmsOutboundMessage object
+	 * @return object of type SmsOutboundMessageData
 	 **/
-	@Override
-	public String toString() {
-		return "SmsOutboundMessage [externalId=" + externalId + ", internalId=" + internalId + ", mifosTenantIdentifier= "
-				+ mifosTenantIdentifier + ", createdOnDate=" + createdOnDate + ", submittedOnDate=" + submittedOnDate
-				+ ", addedOnDate=" + addedOnDate + ", deliveredOnDate=" + deliveredOnDate + ", deliveryStatus=" + deliveryStatus 
-				+ ", deliveryErrorMessage=" + deliveryErrorMessage + ", sourceAddress=" + sourceAddress + ", mobileNumber=" + mobileNumber 
-				+ ", message=" + message + "]";
+	public SmsOutboundMessageData toData() {
+	    final EnumOptionData deliveryStatus = SmsMessageEnumerations.status(this.deliveryStatus);
+	    
+	    return SmsOutboundMessageData.getInstance(this.getId(), this.externalId, this.internalId, this.mifosTenantIdentifier, this.createdOnDate, 
+	            this.submittedOnDate, this.addedOnDate, this.deliveredOnDate, deliveryStatus, this.deliveryErrorMessage, this.mobileNumber, 
+	            this.deliveryErrorMessage);
 	}
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        return "SmsOutboundMessage [externalId=" + externalId + ", internalId=" + internalId
+                + ", mifosTenantIdentifier=" + mifosTenantIdentifier + ", createdOnDate=" + createdOnDate
+                + ", submittedOnDate=" + submittedOnDate + ", addedOnDate=" + addedOnDate + ", deliveredOnDate="
+                + deliveredOnDate + ", deliveryStatus=" + deliveryStatus + ", deliveryErrorMessage="
+                + deliveryErrorMessage + ", sourceAddress=" + sourceAddress + ", mobileNumber=" + mobileNumber
+                + ", message=" + message + "]";
+    }
 }

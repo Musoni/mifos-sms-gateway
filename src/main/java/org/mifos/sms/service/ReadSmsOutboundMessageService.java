@@ -18,5 +18,5 @@ public interface ReadSmsOutboundMessageService {
 	 * @return collection of SmsOutboundMessageResponseData objects whose id is in the externalIds list and 
 	 * mifosTenantIdentifier matches the one provided
 	 **/
-	public Collection<SmsOutboundMessageResponseData> getAll(List<Long> externalIds, String mifosTenantIdentifier);
+	public Collection<SmsOutboundMessageResponseData> findAll(List<Long> externalIds, String mifosTenantIdentifier);
 }

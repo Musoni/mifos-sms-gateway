@@ -62,6 +62,7 @@ dependencies {
     compile "ch.qos.logback:logback-classic:$logbackVersion"
     compile "com.google.code.gson:gson:2.2.4"
     compile "com.googlecode.jsmpp:jsmpp:2.1.0"
+    compile "joda-time:joda-time:2.7"
 }
 
 tomcatRunWar {

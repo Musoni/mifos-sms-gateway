@@ -1,6 +1,5 @@
 package org.mifos.sms.service;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
@@ -9,7 +8,6 @@ import java.util.List;
 import org.mifos.sms.data.SmsOutboundMessageResponseData;
 import org.mifos.sms.domain.SmsOutboundMessage;
 import org.mifos.sms.domain.SmsOutboundMessageRepository;
-import org.mifos.sms.helper.GlobalConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +32,6 @@ public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessa
 		while(iterator.hasNext()) {
 			SmsOutboundMessage smsOutboundMessage = iterator.next();
 			
-			SimpleDateFormat simpleDateFormat = new SimpleDateFormat(GlobalConstants.SIMPLE_DATE_FORMAT);
-			
 			// check if message object has values for mandatory parameters
 			if(!StringUtils.isEmpty(smsOutboundMessage.getInternalId()) && 
 					!StringUtils.isEmpty(smsOutboundMessage.getMifosTenantIdentifier()) && 
@@ -51,7 +47,7 @@ public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessa
 				
 				// add a response data object to the "SmsOutboundMessageResponseData" list
 				smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
-						smsOutboundMessage.getId(), simpleDateFormat.format(smsOutboundMessage.getAddedOnDate()), null, 
+						smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate(), null, 
 						smsOutboundMessage.getDeliveryStatus(), false, null));
 			}
 			

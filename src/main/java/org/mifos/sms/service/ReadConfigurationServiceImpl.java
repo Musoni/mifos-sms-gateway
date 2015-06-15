@@ -1,14 +1,13 @@
 package org.mifos.sms.service;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collection;
 
 import org.mifos.sms.data.ConfigurationData;
-import org.mifos.sms.exception.ConfigurationNotFoundException;
+import org.mifos.sms.domain.Configuration;
+import org.mifos.sms.domain.ConfigurationRepository;
+import org.mifos.sms.domain.ConfigurationRepositoryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 /** 
@@ -19,8 +18,8 @@ import org.springframework.stereotype.Service;
  **/
 @Service
 public class ReadConfigurationServiceImpl implements ReadConfigurationService {
-	private final JdbcTemplate jdbcTemplate;
-	private final ConfigurationMapper configurationMapper;
+	private final ConfigurationRepository configurationRepository;
+	private final ConfigurationRepositoryWrapper configurationRepositoryWrapper;
 	
 	/** 
 	 * ReadConfigurationServiceImpl constructor 
@@ -29,65 +28,27 @@ public class ReadConfigurationServiceImpl implements ReadConfigurationService {
 	 * @return void
 	 **/
 	@Autowired
-	public ReadConfigurationServiceImpl(SmsGatewayDataSource dataSource) {
-		this.jdbcTemplate = new JdbcTemplate(dataSource);
-		this.configurationMapper = new ConfigurationMapper();
+	public ReadConfigurationServiceImpl(ConfigurationRepositoryWrapper configurationRepositoryWrapper) {
+		this.configurationRepository = configurationRepositoryWrapper.getConfigurationRepository();
+		this.configurationRepositoryWrapper = configurationRepositoryWrapper;
 	}
 	
-	/** 
-	 * Maps a resultset to SmsOutboundMessageResponseData object
-	 **/
-	private static final class ConfigurationMapper implements RowMapper<ConfigurationData> {
-		final String queryString;
-		final String tableName = "configuration";
-		
-		public ConfigurationMapper() {
-			final StringBuilder stringBuilder = new StringBuilder(300);
-			stringBuilder.append("t1.* from " + tableName + " t1");
-			
-			queryString = stringBuilder.toString();
+	@Override
+	public Collection<ConfigurationData> findAll() {
+	    Collection<Configuration> configurationCollection = this.configurationRepository.findAll();
+	    Collection<ConfigurationData> configurationDataCollection = new ArrayList<>();
+	    
+		for (Configuration configuration : configurationCollection) {
+		    configurationDataCollection.add(configuration.toData());
 		}
-		
-		/** 
-		 * @return sql query string 
-		 **/
-		public String getQueryString() {
-			return queryString;
-		}
-
-		@Override
-		public ConfigurationData mapRow(ResultSet rs, @SuppressWarnings("unused") int rowNum) throws SQLException {
-			final String name = rs.getString("name");
-			final String value = rs.getString("value");
-			
-			return ConfigurationData.getInstance(name, value);
-		}
+	    
+		return configurationDataCollection;
 	}
 
 	@Override
-	public Collection<ConfigurationData> getAll() {
+	public ConfigurationData findOne(final String name) {
+		final Configuration configuration = this.configurationRepositoryWrapper.findOneThrowExceptionIfNotFound(name);
 		
-		try {
-			return this.jdbcTemplate.query("select " + configurationMapper.getQueryString(), configurationMapper);
-		}
-		
-		catch(Exception e) {
-			throw new ConfigurationNotFoundException("Query for configuration returned an empty resultset");
-		}
+		return configuration.toData();
 	}
-
-	@Override
-	public ConfigurationData get(String name) {
-		
-		try {
-			final String queryString = "select " + configurationMapper.getQueryString() + " where name = ?";
-			
-			return this.jdbcTemplate.queryForObject(queryString, configurationMapper, new Object[] { name });
-		}
-		
-		catch(Exception e) {
-			throw new ConfigurationNotFoundException("Query for configuration with name '" + name + "', returned an empty resultset.");
-		}
-	}
-
 }

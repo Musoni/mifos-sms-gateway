@@ -1,9 +1,6 @@
 package org.mifos.sms.gateway.infobip;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
 import org.mifos.sms.data.ConfigurationData;
 
@@ -18,28 +15,50 @@ public class SmsGatewayConfiguration {
 	private String password;
 	private Boolean enableOutboundMessageScheduler;
 	
+	public static final String DEVELOPMENT_MODE = "DEVELOPMENT_MODE";
+	public static final String SMS_GATEWAY_SYSTEM_ID = "SMS_GATEWAY_SYSTEM_ID";
+	public static final String SMS_GATEWAY_HOSTNAME = "SMS_GATEWAY_HOSTNAME";
+	public static final String SMS_GATEWAY_PORT = "SMS_GATEWAY_PORT";
+	public static final String SMS_GATEWAY_PASSWORD = "SMS_GATEWAY_PASSWORD";
+	public static final String ENABLE_OUTBOUND_MESSSAGE_SCHEDULER = "ENABLE_OUTBOUND_MESSSAGE_SCHEDULER";
+	
 	/** 
 	 * SmsGatewayConfiguration constructor
 	 * 
 	 * @param configurationData collection of ConfigurationData objects
 	 * @return void
 	 **/
-	public SmsGatewayConfiguration(Collection<ConfigurationData> configurationDataSet) {
-		Map<String, String> configurationMap = new HashMap<>();
-		Iterator<ConfigurationData> iterator = configurationDataSet.iterator();
+	public SmsGatewayConfiguration(Collection<ConfigurationData> configurationDataCollection) {
 		
-		while(iterator.hasNext()) {
-			ConfigurationData configurationData = iterator.next();
-			
-    		configurationMap.put(configurationData.getName(), configurationData.getValue());
-    	}
-		
-		developmentMode = Boolean.valueOf(configurationMap.get("DEVELOPMENT_MODE"));
-		systemId = configurationMap.get("SMS_GATEWAY_SYSTEM_ID");
-		hostname = configurationMap.get("SMS_GATEWAY_HOSTNAME");
-		portNumber = Integer.parseInt(configurationMap.get("SMS_GATEWAY_PORT"));
-		password = configurationMap.get("SMS_GATEWAY_PASSWORD");
-		enableOutboundMessageScheduler = Boolean.valueOf(configurationMap.get("ENABLE_OUTBOUND_MESSSAGE_SCHEDULER"));
+	    for (ConfigurationData configurationData : configurationDataCollection) {
+		    if (configurationData.getValue() != null) {
+    		    switch (configurationData.getName()) {
+    		        case DEVELOPMENT_MODE:
+    		            this.developmentMode = Boolean.valueOf(configurationData.getValue());
+    		            break;
+    		            
+    		        case SMS_GATEWAY_SYSTEM_ID:
+    		            this.systemId = configurationData.getValue();
+    		            break;
+    		            
+    		        case SMS_GATEWAY_HOSTNAME:
+    		            this.hostname = configurationData.getValue();
+    		            break;
+    		            
+    		        case SMS_GATEWAY_PORT:
+    		            this.portNumber = Integer.parseInt(configurationData.getValue());
+    		            break;
+    		            
+    		        case SMS_GATEWAY_PASSWORD:
+    		            this.password = configurationData.getValue();
+    		            break;
+    		            
+    		        case ENABLE_OUTBOUND_MESSSAGE_SCHEDULER:
+    		            this.enableOutboundMessageScheduler = Boolean.valueOf(configurationData.getValue());
+    		            break;
+    		    }
+		    }
+		}
 	}
 	
 	/** 

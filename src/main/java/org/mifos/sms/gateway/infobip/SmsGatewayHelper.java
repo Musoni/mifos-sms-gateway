@@ -2,9 +2,9 @@ package org.mifos.sms.gateway.infobip;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.jsmpp.InvalidResponseException;
 import org.jsmpp.PDUException;
@@ -34,6 +34,7 @@ import org.jsmpp.session.SMPPSession;
 import org.jsmpp.session.Session;
 import org.jsmpp.session.SessionStateListener;
 import org.jsmpp.util.InvalidDeliveryReceiptException;
+import org.mifos.sms.data.ConfigurationData;
 import org.mifos.sms.domain.SmsMessageStatusType;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
 import org.mifos.sms.service.ReadConfigurationService;
@@ -53,8 +54,9 @@ public class SmsGatewayHelper {
 	private static final Logger logger = LoggerFactory.getLogger(SmsGatewayHelper.class);
 	private long reconnectInterval = 10000L; // 10 seconds
 	private SMPPSession session = null;
-	public final List<SmsGatewayDeliveryReport> smsGatewayDeliveryReports = new ArrayList<>();
-	private final Map<String, String> configuration = new HashMap<>();
+	// the list is wrapped using "Collections.synchronizedList" to prevent accidental unsynchronized access to the list
+	// @see http://docs.oracle.com/javase/7/docs/api/java/util/ArrayList.html
+	public final List<Object> smsGatewayDeliveryReports = Collections.synchronizedList(new ArrayList<>());
 	public Boolean isConnected = false;
 	public Boolean isReconnecting = false;
 	public SmsGatewayConfiguration smsGatewayConfiguration;
@@ -63,9 +65,10 @@ public class SmsGatewayHelper {
     @Autowired
     public SmsGatewayHelper(ReadConfigurationService readConfigurationService) {
     	this.readConfigurationService = readConfigurationService;
+    	Collection<ConfigurationData> configurationDataCollection = this.readConfigurationService.findAll();
     	
     	// get an instance of the SmsGatewayConfiguration class
-    	smsGatewayConfiguration = new SmsGatewayConfiguration(this.readConfigurationService.getAll());
+    	smsGatewayConfiguration = new SmsGatewayConfiguration(configurationDataCollection);
     }
     
     /** 
@@ -73,17 +76,6 @@ public class SmsGatewayHelper {
      **/
     public SMPPSession getSession() {
     	return session;
-    }
-    
-    /** 
-     * get a configuration value by name 
-     * 
-     * @param name the name of the configuration
-     * @return configuration value
-     **/
-    public String getConfigurationValue(String name) {
-    	// get value from the configuration hash map
-    	return configuration.get(name);
     }
     
     /** 
@@ -289,7 +281,7 @@ public class SmsGatewayHelper {
     /** 
      * create new SMPPSession object, connect and bind SMPP session 
      * 
-     * @return SMPPSession object
+     * @return {@link SMPPSession} object
      **/
     public final SMPPSession connectAndBindSession() {
     	session = new SMPPSession();
@@ -316,7 +308,7 @@ public class SmsGatewayHelper {
     /** 
      * Unbind and close open SMPP session
      * 
-     * @return void
+     * @return None
      **/
     public final void unbindAndCloseSession() {
     	session.unbindAndClose();
@@ -328,7 +320,7 @@ public class SmsGatewayHelper {
      * @param smsGatewayMessage SmsGatewayMessage object
      * @param session SMPPSession object
      * 
-     * @return SmsGatewayMessage object
+     * @return {@link SmsGatewayMessage} object
      **/
     public SmsGatewayMessage submitShortMessage(SmsGatewayMessage smsGatewayMessage) {
         String messageId = "";
@@ -378,7 +370,7 @@ public class SmsGatewayHelper {
      * Reconnect session after specified interval.
      * 
      * @param timeInMillis is the interval.
-     * @return void
+     * @return None
      */
     public void reconnectAndBindSession() {
     	if(!isReconnecting && reconnect) {
@@ -453,7 +445,7 @@ public class SmsGatewayHelper {
                     
                     // in development mode (a simulator gateway is used), retrieving the message ID is different
                     if(developmentMode()) {
-                    	messageId = Long.toString(Long.parseLong(deliveryReceipt.getId()) & 0xffffffff, 16).toUpperCase();
+                    	messageId = Long.toString(Long.parseLong(deliveryReceipt.getId()) & 0xffffffff, 16);
                     }
                     
                     SmsMessageStatusType messageStatus = null;
@@ -482,6 +474,7 @@ public class SmsGatewayHelper {
                     // add the SmsGatewayDeliveryReport object to the smsGatewayDeliveryReports List
                     smsGatewayDeliveryReports.add(smsGatewayDeliveryReport);
                     
+                    // log success message
                     logger.info("Receiving delivery report for message '" + messageId + "' : " + smsGatewayDeliveryReport.toString());
                } 
                
