@@ -1,7 +1,5 @@
 package org.mifos.sms.data;
 
-import org.joda.time.LocalDate;
-
 /** 
  * Immutable data object representing an outbound SMS message API response data
  * 
@@ -11,8 +9,8 @@ public class SmsOutboundMessageResponseData {
 	
 	private Long id;
 	private Long externalId;
-	private LocalDate addedOnDate;
-	private LocalDate deliveredOnDate;
+	private String addedOnDate;
+	private String deliveredOnDate;
 	private Integer deliveryStatus;
 	private Boolean hasError;
 	private String errorMessage;
@@ -22,7 +20,7 @@ public class SmsOutboundMessageResponseData {
 	 * 
 	 * @return void 
 	 **/
-	private SmsOutboundMessageResponseData(Long id, Long externalId, LocalDate addedOnDate, LocalDate deliveredOnDate, 
+	private SmsOutboundMessageResponseData(Long id, Long externalId, String addedOnDate, String deliveredOnDate, 
 			Integer deliveryStatus, Boolean hasError, String errorMessage) {
 		this.id = id;
 		this.externalId = externalId;
@@ -43,7 +41,7 @@ public class SmsOutboundMessageResponseData {
 	/** 
 	 * @return an instance of the SmsOutboundMessageResponseData class
 	 **/
-	public static SmsOutboundMessageResponseData getInstance(Long id, Long externalId, LocalDate addedOnDate, LocalDate deliveredOnDate, 
+	public static SmsOutboundMessageResponseData getInstance(Long id, Long externalId, String addedOnDate, String deliveredOnDate, 
 			Integer deliveryStatus, Boolean hasError, String errorMessage) {
 		
 		return new SmsOutboundMessageResponseData(id, externalId, addedOnDate, deliveredOnDate, deliveryStatus, hasError, errorMessage);
@@ -66,14 +64,14 @@ public class SmsOutboundMessageResponseData {
 	/**
 	 * @return the addedOnDate
 	 */
-	public LocalDate getAddedOnDate() {
+	public String getAddedOnDate() {
 		return addedOnDate;
 	}
 
 	/**
 	 * @return the deliveredOnDate
 	 */
-	public LocalDate getDeliveredOnDate() {
+	public String getDeliveredOnDate() {
 		return deliveredOnDate;
 	}
 

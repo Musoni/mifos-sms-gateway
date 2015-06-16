@@ -35,7 +35,7 @@ public class ReadSmsOutboundMessageServiceImpl implements ReadSmsOutboundMessage
             Integer deliveryStatus = smsOutboundMessage.getDeliveryStatus();
 	        
 	        SmsOutboundMessageResponseData smsOutboundMessageResponseData = SmsOutboundMessageResponseData.getInstance(id, externalId, 
-	                addedOnDate, deliveredOnDate, deliveryStatus, false, "");
+	                addedOnDate.toString(), deliveredOnDate.toString(), deliveryStatus, false, "");
 	        
 	        smsOutboundMessageResponseDataCollection.add(smsOutboundMessageResponseData);
 	    }

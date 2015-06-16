@@ -47,7 +47,7 @@ public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessa
 				
 				// add a response data object to the "SmsOutboundMessageResponseData" list
 				smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
-						smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate(), null, 
+						smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate().toString(), null, 
 						smsOutboundMessage.getDeliveryStatus(), false, null));
 			}
 			
