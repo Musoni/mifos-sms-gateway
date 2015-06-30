@@ -8,7 +8,9 @@ package org.mifos.sms.exception;
  **/
 public class SmsOutboundMessageNotFoundException extends RuntimeException {
 	
-	/** 
+	private static final long serialVersionUID = -942901893587315527L;
+
+    /** 
 	 * SmsOutboundMessageNotFoundException constructor
 	 * 
 	 * @param message the exception message

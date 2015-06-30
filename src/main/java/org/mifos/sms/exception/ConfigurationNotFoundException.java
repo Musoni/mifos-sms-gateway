@@ -8,7 +8,9 @@ package org.mifos.sms.exception;
  **/
 public class ConfigurationNotFoundException extends RuntimeException {
 
-	/** 
+	private static final long serialVersionUID = 6480693364997530945L;
+
+    /** 
 	 * ConfigurationNotFoundException constructor
 	 * 
 	 * @param message the exception message

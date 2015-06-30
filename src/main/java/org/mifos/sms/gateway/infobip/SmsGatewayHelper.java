@@ -1,10 +1,7 @@
 package org.mifos.sms.gateway.infobip;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 
 import org.jsmpp.InvalidResponseException;
 import org.jsmpp.PDUException;
@@ -36,6 +33,8 @@ import org.jsmpp.session.SessionStateListener;
 import org.jsmpp.util.InvalidDeliveryReceiptException;
 import org.mifos.sms.data.ConfigurationData;
 import org.mifos.sms.domain.SmsMessageStatusType;
+import org.mifos.sms.domain.SmsOutboundMessage;
+import org.mifos.sms.domain.SmsOutboundMessageRepository;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
 import org.mifos.sms.service.ReadConfigurationService;
 import org.slf4j.Logger;
@@ -54,17 +53,17 @@ public class SmsGatewayHelper {
 	private static final Logger logger = LoggerFactory.getLogger(SmsGatewayHelper.class);
 	private long reconnectInterval = 10000L; // 10 seconds
 	private SMPPSession session = null;
-	// the list is wrapped using "Collections.synchronizedList" to prevent accidental unsynchronized access to the list
-	// @see http://docs.oracle.com/javase/7/docs/api/java/util/ArrayList.html
-	public final List<Object> smsGatewayDeliveryReports = Collections.synchronizedList(new ArrayList<>());
 	public Boolean isConnected = false;
 	public Boolean isReconnecting = false;
 	public SmsGatewayConfiguration smsGatewayConfiguration;
 	public Boolean reconnect = true;
+	private final SmsOutboundMessageRepository smsOutboundMessageRepository;
     
     @Autowired
-    public SmsGatewayHelper(ReadConfigurationService readConfigurationService) {
+    public SmsGatewayHelper(final ReadConfigurationService readConfigurationService, 
+            final SmsOutboundMessageRepository smsOutboundMessageRepository) {
     	this.readConfigurationService = readConfigurationService;
+    	this.smsOutboundMessageRepository = smsOutboundMessageRepository;
     	Collection<ConfigurationData> configurationDataCollection = this.readConfigurationService.findAll();
     	
     	// get an instance of the SmsGatewayConfiguration class
@@ -471,8 +470,8 @@ public class SmsGatewayHelper {
                     // create a new SmsGatewayDeliveryReport object with data received from the SMS gateway
                     SmsGatewayDeliveryReport smsGatewayDeliveryReport = new SmsGatewayDeliveryReport(messageId, deliveryReceipt.getSubmitDate(), deliveryReceipt.getDoneDate(), messageStatus);
                     
-                    // add the SmsGatewayDeliveryReport object to the smsGatewayDeliveryReports List
-                    smsGatewayDeliveryReports.add(smsGatewayDeliveryReport);
+                    // update SmsGatewayDeliveryReport entity delivery status and date
+                    processDeliveryReport(smsGatewayDeliveryReport);
                     
                     // log success message
                     logger.info("Receiving delivery report for message '" + messageId + "' : " + smsGatewayDeliveryReport.toString());
@@ -496,5 +495,41 @@ public class SmsGatewayHelper {
         
         @Override
 		public void onAcceptAlertNotification(AlertNotification alertNotification) {}
+    }
+    
+    /** 
+     * Process the delivery report. Update the delivery status and date of the SmsOutboundMessage entity 
+     * 
+     * @param smsGatewayDeliveryReport {@link SmsGatewayDeliveryReport} object
+     * @return None
+     **/
+    public void processDeliveryReport(SmsGatewayDeliveryReport smsGatewayDeliveryReport) {
+        
+        if (smsGatewayDeliveryReport != null) {
+            // get the SmsMessage object from the DB
+            SmsOutboundMessage smsOutboundMessage = this.smsOutboundMessageRepository.findByExternalId(smsGatewayDeliveryReport.getExternalId());
+            
+            if(smsOutboundMessage != null) {
+                // update the status of the SMS message
+                smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
+                
+                switch(smsGatewayDeliveryReport.getStatus()) {
+                    case DELIVERED:
+                        // update the delivery date of the SMS message
+                        smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
+                        break;
+                        
+                    default:
+                        // at the moment, do nothing
+                        break;
+                }
+                
+                // save the "SmsOutboundMessage" entity
+                this.smsOutboundMessageRepository.save(smsOutboundMessage);
+                
+                // log success message
+                logger.info("SMS message with external ID '" + smsOutboundMessage.getExternalId() + "' successfully updated. Status set to: " + smsOutboundMessage.getDeliveryStatus().toString());
+            }
+        }
     }
 }
