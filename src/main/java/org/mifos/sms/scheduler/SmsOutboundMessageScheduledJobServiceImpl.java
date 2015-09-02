@@ -91,6 +91,6 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 	 * TODO this should be configurable, add to c_configuration
 	 **/
 	private int getMaximumNumberOfMessagesToBeSent() {
-		return 100;
+		return 5000;
 	}
 }
