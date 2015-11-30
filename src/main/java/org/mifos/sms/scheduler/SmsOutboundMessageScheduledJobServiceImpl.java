@@ -45,7 +45,7 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 				List<SmsOutboundMessage> smsOutboundMessages = smsOutboundMessageRepository.findByDeliveryStatus(SmsMessageStatusType.PENDING.getValue(), pageable);
 				
 				// only proceed if there are pending messages
-		        if(smsOutboundMessages.size() > 0) {
+		        if((smsOutboundMessages != null) && smsOutboundMessages.size() > 0) {
 		            
 		            for(SmsOutboundMessage smsOutboundMessage : smsOutboundMessages) {
 		                SmsGatewayMessage smsGatewayMessage = new SmsGatewayMessage(smsOutboundMessage.getId(), 

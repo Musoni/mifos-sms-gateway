@@ -2,6 +2,7 @@ package org.mifos.sms.gateway.infobip;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Random;
 
 import org.jsmpp.InvalidResponseException;
 import org.jsmpp.PDUException;
@@ -17,6 +18,8 @@ import org.jsmpp.bean.GeneralDataCoding;
 import org.jsmpp.bean.MessageClass;
 import org.jsmpp.bean.MessageType;
 import org.jsmpp.bean.NumberingPlanIndicator;
+import org.jsmpp.bean.OptionalParameter;
+import org.jsmpp.bean.OptionalParameters;
 import org.jsmpp.bean.RegisteredDelivery;
 import org.jsmpp.bean.SMSCDeliveryReceipt;
 import org.jsmpp.bean.TypeOfNumber;
@@ -31,6 +34,7 @@ import org.jsmpp.session.SMPPSession;
 import org.jsmpp.session.Session;
 import org.jsmpp.session.SessionStateListener;
 import org.jsmpp.util.InvalidDeliveryReceiptException;
+import org.jsmpp.util.StringParameter;
 import org.mifos.sms.data.ConfigurationData;
 import org.mifos.sms.domain.SmsMessageStatusType;
 import org.mifos.sms.domain.SmsOutboundMessage;
@@ -58,6 +62,9 @@ public class SmsGatewayHelper {
 	public SmsGatewayConfiguration smsGatewayConfiguration;
 	public Boolean reconnect = true;
 	private final SmsOutboundMessageRepository smsOutboundMessageRepository;
+	
+	// represents the max size of a fragment of a concatenated short message
+	public static final Integer SHORT_MESSAGE_FRAGMENT_MAX_SIZE = 140;
     
     @Autowired
     public SmsGatewayHelper(final ReadConfigurationService readConfigurationService, 
@@ -271,6 +278,14 @@ public class SmsGatewayHelper {
     }
     
     /** 
+     * @return 8-bit binary octet unspecified coding GSM Data-Coding-Scheme
+     **/
+    public final DataCoding eightBitDataCoding() {
+        // ignore any IDE warnings
+        return new GeneralDataCoding(Alphabet.ALPHA_8_BIT, MessageClass.CLASS1, false);
+    }
+    
+    /** 
      * @return default short message to send, by providing an index into the table of Predefined Messages set up by the SMSC administrator.
      **/
     public final byte smDefaultMsgId() {
@@ -317,7 +332,6 @@ public class SmsGatewayHelper {
      * Send the SMS message to the SMS gateway
      * 
      * @param smsGatewayMessage SmsGatewayMessage object
-     * @param session SMPPSession object
      * 
      * @return {@link SmsGatewayMessage} object
      **/
@@ -327,8 +341,12 @@ public class SmsGatewayHelper {
         String sourceAddress = smsGatewayMessage.getSourceAddress();
         String mobileNumber = smsGatewayMessage.getMobileNumber();
         
+        if (message != null && message.length() > StringParameter.SHORT_MESSAGE.getMax()) {
+            return this.submitSegmentedShortMessage(smsGatewayMessage);
+        }
+        
         try {
-        	messageId = session.submitShortMessage(serviceType(), sourceAddrTon(), 
+            messageId = session.submitShortMessage(serviceType(), sourceAddrTon(), 
                     sourceAddrNpi(), sourceAddress, destAddrTon(), 
                     destAddrNpi(), mobileNumber, esmClass(), protocolId(), 
                     priorityFlag(), scheduledDeliveryTime(), validityPeriod(), 
@@ -339,8 +357,8 @@ public class SmsGatewayHelper {
         } 
         
         catch (PDUException e) {
-            // Invalid PDU parameter
-            logger.error("Invalid PDU parameter");
+            // Invalid PDU parameter - mostly resulting from failed validation
+            logger.error("Invalid PDU parameter", e);
         } 
         
         catch (ResponseTimeoutException e) {
@@ -360,6 +378,73 @@ public class SmsGatewayHelper {
         
         catch (IOException e) {
             logger.error("IO error occur");
+        }
+        
+        return new SmsGatewayMessage(smsGatewayMessage.getId(), messageId, sourceAddress, mobileNumber, message);
+    }
+    
+    /** 
+     * Send segmented SMS messages to the SMS gateway
+     * 
+     * @param smsGatewayMessage SmsGatewayMessage object
+     * 
+     * @return {@link SmsGatewayMessage} object
+     **/
+    public SmsGatewayMessage submitSegmentedShortMessage(SmsGatewayMessage smsGatewayMessage) {
+        String messageId = "";
+        String message = smsGatewayMessage.getMessage();
+        String sourceAddress = smsGatewayMessage.getSourceAddress();
+        String mobileNumber = smsGatewayMessage.getMobileNumber();
+        
+        if (message != null && message.length() > StringParameter.SHORT_MESSAGE.getMax()) {
+            final Random random = new Random();
+            final int totalSegments = this.getTotalSegmentsForShortMessage(message);
+            final OptionalParameter sarMsgRefNum = OptionalParameters.newSarMsgRefNum((short)random.nextInt());
+            final OptionalParameter sarTotalSegments = OptionalParameters.newSarTotalSegments(totalSegments);
+            final String[] segmentData = this.splitShortMessageIntoSegments(message, 
+                    SHORT_MESSAGE_FRAGMENT_MAX_SIZE, totalSegments);
+            
+            for (int i = 0; i < totalSegments; i++) {
+                final int seqNum = i + 1;
+                final OptionalParameter sarSegmentSeqnum = OptionalParameters.newSarSegmentSeqnum(seqNum);
+                
+                try {
+                    messageId = session.submitShortMessage(serviceType(), sourceAddrTon(), 
+                            sourceAddrNpi(), sourceAddress, destAddrTon(), 
+                            destAddrNpi(), mobileNumber, esmClass(), protocolId(), 
+                            priorityFlag(), scheduledDeliveryTime(), validityPeriod(), 
+                            registeredDelivery(), replaceIfPresentFlag(), eightBitDataCoding(), 
+                            smDefaultMsgId(), segmentData[i].getBytes(), sarMsgRefNum, 
+                            sarSegmentSeqnum, sarTotalSegments);
+                    
+                    logger.info("Message segment " + seqNum + " out of " + totalSegments 
+                            + " segments sent to " + mobileNumber +  ", SMS gateway message ID is " + messageId);
+                } 
+                
+                catch (PDUException e) {
+                    // Invalid PDU parameter - mostly resulting from failed validation
+                    logger.error("Invalid PDU parameter", e);
+                } 
+                
+                catch (ResponseTimeoutException e) {
+                    // Response timeout
+                    logger.error("Response timeout");
+                } 
+                
+                catch (InvalidResponseException e) {
+                    // Invalid response
+                    logger.error("Receive invalid response");
+                } 
+                
+                catch (NegativeResponseException e) {
+                    // Receiving negative response (non-zero command_status)
+                    logger.error("Receive negative response");
+                } 
+                
+                catch (IOException e) {
+                    logger.error("IO error occur");
+                }
+            }
         }
         
         return new SmsGatewayMessage(smsGatewayMessage.getId(), messageId, sourceAddress, mobileNumber, message);
@@ -531,5 +616,67 @@ public class SmsGatewayHelper {
                 logger.info("SMS message with external ID '" + smsOutboundMessage.getExternalId() + "' successfully updated. Status set to: " + smsOutboundMessage.getDeliveryStatus().toString());
             }
         }
+    }
+    
+    /** 
+     * get the total number of segments of the short message based on 
+     * the value of "SHORT_MESSAGE_FRAGMENT_MAX_SIZE" constant
+     * 
+     * @param message -- short message
+     * @return the total number of segments
+     **/
+    public int getTotalSegmentsForShortMessage(String message)
+    {
+        int totalsegments = 1;
+        
+        if (message != null && message.length() > SHORT_MESSAGE_FRAGMENT_MAX_SIZE)
+        {
+            totalsegments = (message.length() / SHORT_MESSAGE_FRAGMENT_MAX_SIZE) 
+                    + ((message.length() % SHORT_MESSAGE_FRAGMENT_MAX_SIZE > 0) ? 1 : 0);
+        }
+        
+        return totalsegments;
+    }
+
+    /** 
+     * split short message into segments
+     * 
+     * @param message -- short message
+     * @param segmentMaxSize -- maximum size of each segment of the long short message
+     * @param totalSegments -- total number of segments
+     * @return short message segment string array
+     **/
+    public String[] splitShortMessageIntoSegments(String message, int segmentMaxSize, int totalSegments)
+    {
+        String[] segmentData = new String[totalSegments];
+        
+        if (totalSegments > 1)
+        {
+            int splitPos = segmentMaxSize;
+
+            int startIndex = 0;
+
+            segmentData[startIndex] = new String();
+            segmentData[startIndex] = message.substring(startIndex, splitPos);
+
+            for (int i = 1; i < totalSegments; i++)
+            {
+                segmentData[i] = new String();
+                startIndex = splitPos;
+                
+                if (message.length() - startIndex <= segmentMaxSize)
+                {
+                    segmentData[i] = message.substring(startIndex, message.length());
+                }
+                
+                else
+                {
+                    splitPos = startIndex + segmentMaxSize;
+                    segmentData[i] = message.substring(startIndex, splitPos);
+                }
+            }
+        }
+        
+        return segmentData;
     }
 }
