@@ -14,12 +14,12 @@ import org.jsmpp.bean.DataSm;
 import org.jsmpp.bean.DeliverSm;
 import org.jsmpp.bean.DeliveryReceipt;
 import org.jsmpp.bean.ESMClass;
+import org.jsmpp.bean.GSMSpecificFeature;
 import org.jsmpp.bean.GeneralDataCoding;
 import org.jsmpp.bean.MessageClass;
+import org.jsmpp.bean.MessageMode;
 import org.jsmpp.bean.MessageType;
 import org.jsmpp.bean.NumberingPlanIndicator;
-import org.jsmpp.bean.OptionalParameter;
-import org.jsmpp.bean.OptionalParameters;
 import org.jsmpp.bean.RegisteredDelivery;
 import org.jsmpp.bean.SMSCDeliveryReceipt;
 import org.jsmpp.bean.TypeOfNumber;
@@ -36,10 +36,12 @@ import org.jsmpp.session.SessionStateListener;
 import org.jsmpp.util.InvalidDeliveryReceiptException;
 import org.jsmpp.util.StringParameter;
 import org.mifos.sms.data.ConfigurationData;
+import org.mifos.sms.data.SmsShortMessage;
 import org.mifos.sms.domain.SmsMessageStatusType;
 import org.mifos.sms.domain.SmsOutboundMessage;
 import org.mifos.sms.domain.SmsOutboundMessageRepository;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
+import org.mifos.sms.helper.Gsm0338;
 import org.mifos.sms.service.ReadConfigurationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +67,9 @@ public class SmsGatewayHelper {
 	
 	// represents the max size of a fragment of a concatenated short message
 	public static final Integer SHORT_MESSAGE_FRAGMENT_MAX_SIZE = 140;
+	
+    private static final int MAX_SINGLE_MSG_SEGMENT_SIZE_UCS2 = 70;
+    private static final int MAX_SINGLE_MSG_SEGMENT_SIZE_7BIT = 160;
     
     @Autowired
     public SmsGatewayHelper(final ReadConfigurationService readConfigurationService, 
@@ -278,14 +283,6 @@ public class SmsGatewayHelper {
     }
     
     /** 
-     * @return 8-bit binary octet unspecified coding GSM Data-Coding-Scheme
-     **/
-    public final DataCoding eightBitDataCoding() {
-        // ignore any IDE warnings
-        return new GeneralDataCoding(Alphabet.ALPHA_8_BIT, MessageClass.CLASS1, false);
-    }
-    
-    /** 
      * @return default short message to send, by providing an index into the table of Predefined Messages set up by the SMSC administrator.
      **/
     public final byte smDefaultMsgId() {
@@ -336,24 +333,62 @@ public class SmsGatewayHelper {
      * @return {@link SmsGatewayMessage} object
      **/
     public SmsGatewayMessage submitShortMessage(SmsGatewayMessage smsGatewayMessage) {
-        String messageId = "";
         String message = smsGatewayMessage.getMessage();
-        String sourceAddress = smsGatewayMessage.getSourceAddress();
-        String mobileNumber = smsGatewayMessage.getMobileNumber();
         
         if (message != null && message.length() > StringParameter.SHORT_MESSAGE.getMax()) {
-            return this.submitSegmentedShortMessage(smsGatewayMessage);
+            smsGatewayMessage = this.submitSegmentedShortMessages(smsGatewayMessage);
         }
         
-        try {
-            messageId = session.submitShortMessage(serviceType(), sourceAddrTon(), 
-                    sourceAddrNpi(), sourceAddress, destAddrTon(), 
-                    destAddrNpi(), mobileNumber, esmClass(), protocolId(), 
-                    priorityFlag(), scheduledDeliveryTime(), validityPeriod(), 
-                    registeredDelivery(), replaceIfPresentFlag(), dataCoding(), 
-                    smDefaultMsgId(), message.getBytes());
+        else if (message != null) {
+            // create a new SmsShortMessage object
+            final SmsShortMessage smsShortMessage = SmsShortMessage.newSmsShortMessage(
+                    smsGatewayMessage.getId(), this.serviceType(), this.sourceAddrTon(), 
+                    this.sourceAddrNpi(), smsGatewayMessage.getSourceAddress(), this.destAddrTon(), 
+                    this.destAddrNpi(), smsGatewayMessage.getMobileNumber(), 
+                    this.esmClass(), this.protocolId(), this.priorityFlag(), 
+                    this.scheduledDeliveryTime(), this.validityPeriod(), 
+                    this.registeredDelivery(), this.replaceIfPresentFlag(), this.dataCoding(), 
+                    this.smDefaultMsgId(), message.getBytes(), 1, 1);
             
-            logger.info("Message sent to " + mobileNumber +  ", SMS gateway message ID is " + messageId);
+            // send short message to SMSC (short message service center)
+            smsGatewayMessage = this.submitShortMessage(smsShortMessage);
+        }
+        
+        return smsGatewayMessage;
+    }
+    
+    /**
+     * Send SMS message to the SMS gateway
+     * 
+     * @param smsShortMessage
+     * @return {@link SmsGatewayMessage} object
+     */
+    public SmsGatewayMessage submitShortMessage(final SmsShortMessage smsShortMessage) {
+        String messageId = "";
+        
+        try {
+            messageId = session.submitShortMessage(smsShortMessage.getServiceType(), 
+                    smsShortMessage.getSourceAddressTypeofNumber(), 
+                    smsShortMessage.getSourceAddressNumberingPlanIndicator(), 
+                    smsShortMessage.getSourceAddress(), 
+                    smsShortMessage.getDestinationAddressTypeOfNumber(), 
+                    smsShortMessage.getDestinationAddressNumberingPlanIndicator(), 
+                    smsShortMessage.getDestinationAddress(), 
+                    smsShortMessage.getEsmClass(), 
+                    smsShortMessage.getProtocolId(), 
+                    smsShortMessage.getPriorityFlag(), 
+                    smsShortMessage.getScheduleDeliveryTime(), 
+                    smsShortMessage.getValidityPeriod(), 
+                    smsShortMessage.getRegisteredDelivery(), 
+                    smsShortMessage.getReplaceIfPresentFlag(), 
+                    smsShortMessage.getDataCoding(), 
+                    smsShortMessage.getDefaultMessageId(), 
+                    smsShortMessage.getShortMessage().getBytes());
+            
+            logger.info("Message segment " + smsShortMessage.getMessageSegmentNumber() 
+                    + " out of " + smsShortMessage.getTotalNumberOfMessageSegments() 
+                    + " segments sent to " + smsShortMessage.getDestinationAddress() 
+                    +  ", SMS gateway message ID is " + messageId);
         } 
         
         catch (PDUException e) {
@@ -377,10 +412,12 @@ public class SmsGatewayHelper {
         } 
         
         catch (IOException e) {
-            logger.error("IO error occur");
+            logger.error("IO error occur", e);
         }
         
-        return new SmsGatewayMessage(smsGatewayMessage.getId(), messageId, sourceAddress, mobileNumber, message);
+        return new SmsGatewayMessage(smsShortMessage.getMessageId(), messageId, 
+                smsShortMessage.getSourceAddress(), smsShortMessage.getDestinationAddress(), 
+                smsShortMessage.getShortMessage());
     }
     
     /** 
@@ -390,64 +427,73 @@ public class SmsGatewayHelper {
      * 
      * @return {@link SmsGatewayMessage} object
      **/
-    public SmsGatewayMessage submitSegmentedShortMessage(SmsGatewayMessage smsGatewayMessage) {
-        String messageId = "";
+    public SmsGatewayMessage submitSegmentedShortMessages(SmsGatewayMessage smsGatewayMessage) {
         String message = smsGatewayMessage.getMessage();
-        String sourceAddress = smsGatewayMessage.getSourceAddress();
-        String mobileNumber = smsGatewayMessage.getMobileNumber();
+        
+        Alphabet alphabet = null;
+        int maximumSingleMessageSize = 0;
+        byte[] originalMessageBytes = null;
         
         if (message != null && message.length() > StringParameter.SHORT_MESSAGE.getMax()) {
-            final Random random = new Random();
-            final int totalSegments = this.getTotalSegmentsForShortMessage(message);
-            final OptionalParameter sarMsgRefNum = OptionalParameters.newSarMsgRefNum((short)random.nextInt());
-            final OptionalParameter sarTotalSegments = OptionalParameters.newSarTotalSegments(totalSegments);
-            final String[] segmentData = this.splitShortMessageIntoSegments(message, 
-                    SHORT_MESSAGE_FRAGMENT_MAX_SIZE, totalSegments);
-            
-            for (int i = 0; i < totalSegments; i++) {
-                final int seqNum = i + 1;
-                final OptionalParameter sarSegmentSeqnum = OptionalParameters.newSarSegmentSeqnum(seqNum);
-                
-                try {
-                    messageId = session.submitShortMessage(serviceType(), sourceAddrTon(), 
-                            sourceAddrNpi(), sourceAddress, destAddrTon(), 
-                            destAddrNpi(), mobileNumber, esmClass(), protocolId(), 
-                            priorityFlag(), scheduledDeliveryTime(), validityPeriod(), 
-                            registeredDelivery(), replaceIfPresentFlag(), eightBitDataCoding(), 
-                            smDefaultMsgId(), segmentData[i].getBytes(), sarMsgRefNum, 
-                            sarSegmentSeqnum, sarTotalSegments);
-                    
-                    logger.info("Message segment " + seqNum + " out of " + totalSegments 
-                            + " segments sent to " + mobileNumber +  ", SMS gateway message ID is " + messageId);
+            try {
+                if (Gsm0338.isEncodeableInGsm0338(message)) {
+                    originalMessageBytes = message.getBytes();
+                    alphabet = Alphabet.ALPHA_DEFAULT;
+                    maximumSingleMessageSize = MAX_SINGLE_MSG_SEGMENT_SIZE_7BIT;
                 } 
                 
-                catch (PDUException e) {
-                    // Invalid PDU parameter - mostly resulting from failed validation
-                    logger.error("Invalid PDU parameter", e);
-                } 
-                
-                catch (ResponseTimeoutException e) {
-                    // Response timeout
-                    logger.error("Response timeout");
-                } 
-                
-                catch (InvalidResponseException e) {
-                    // Invalid response
-                    logger.error("Receive invalid response");
-                } 
-                
-                catch (NegativeResponseException e) {
-                    // Receiving negative response (non-zero command_status)
-                    logger.error("Receive negative response");
-                } 
-                
-                catch (IOException e) {
-                    logger.error("IO error occur");
+                else {
+                    originalMessageBytes = message.getBytes("UTF-16BE");
+                    alphabet = Alphabet.ALPHA_UCS2;
+                    maximumSingleMessageSize = MAX_SINGLE_MSG_SEGMENT_SIZE_UCS2;
                 }
+
+                // check if message needs splitting and set required sending parameters
+                byte[][] segmentedMessagesBytes = null;
+                ESMClass esmClass = null;
+                
+                if (message.length() > maximumSingleMessageSize) {
+                    byte[] referenceNumber = new byte[1];
+                    new Random().nextBytes(referenceNumber);
+                    
+                    segmentedMessagesBytes = createConcatenatedBinaryShortMessages(originalMessageBytes, 
+                            referenceNumber[0]);
+                    
+                    // set UDHI so PDU will decode the header
+                    esmClass = new ESMClass(MessageMode.DEFAULT, MessageType.DEFAULT, GSMSpecificFeature.UDHI);
+                } 
+                
+                else {
+                    segmentedMessagesBytes = new byte[][] { originalMessageBytes };
+                    esmClass = new ESMClass();
+                }
+                
+                // submit all messages
+                for (int i = 0; i < segmentedMessagesBytes.length; i++) {
+                    int segmentNumber = i + 1;
+                    
+                    // create a new SmsShortMessage object
+                    final SmsShortMessage smsShortMessage = SmsShortMessage.newSmsShortMessage(
+                            smsGatewayMessage.getId(), this.serviceType(), this.sourceAddrTon(), 
+                            this.sourceAddrNpi(), smsGatewayMessage.getSourceAddress(), this.destAddrTon(), 
+                            this.destAddrNpi(), smsGatewayMessage.getMobileNumber(), 
+                            esmClass, this.protocolId(), this.priorityFlag(), 
+                            this.scheduledDeliveryTime(), this.validityPeriod(), 
+                            this.registeredDelivery(), this.replaceIfPresentFlag(), 
+                            new GeneralDataCoding(alphabet, esmClass), this.smDefaultMsgId(), 
+                            segmentedMessagesBytes[i], segmentNumber, segmentedMessagesBytes.length);
+                    
+                    // send short message to SMSC (short message service center)
+                    smsGatewayMessage = this.submitShortMessage(smsShortMessage);
+                }
+            }
+            
+            catch (IOException e) {
+                logger.error("IO error occur", e);
             }
         }
         
-        return new SmsGatewayMessage(smsGatewayMessage.getId(), messageId, sourceAddress, mobileNumber, message);
+        return smsGatewayMessage;
     }
     
     /**
@@ -618,65 +664,79 @@ public class SmsGatewayHelper {
         }
     }
     
-    /** 
-     * get the total number of segments of the short message based on 
-     * the value of "SHORT_MESSAGE_FRAGMENT_MAX_SIZE" constant
-     * 
-     * @param message -- short message
-     * @return the total number of segments
-     **/
-    public int getTotalSegmentsForShortMessage(String message)
-    {
-        int totalsegments = 1;
-        
-        if (message != null && message.length() > SHORT_MESSAGE_FRAGMENT_MAX_SIZE)
-        {
-            totalsegments = (message.length() / SHORT_MESSAGE_FRAGMENT_MAX_SIZE) 
-                    + ((message.length() % SHORT_MESSAGE_FRAGMENT_MAX_SIZE > 0) ? 1 : 0);
+    /**
+     * Creates multiple short messages (that include a user data header) by
+     * splitting the binaryShortMessage data into 134 byte parts.  If the
+     * binaryShortMessage does not need to be concatenated (less than or equal
+     * to 140 bytes), this method will return NULL.
+     * <br><br>
+     * WARNING: This method only works on binary short messages that use 8-bit
+     * bytes.  Short messages using 7-bit data or packed 7-bit data will not
+     * be correctly handled by this method.
+     * <br><br>
+     * For example, will take a byte message (in hex, 138 bytes long)
+     * <br>
+     *   01020304...85&lt;byte 134&gt;87888990
+     * <br><br>
+     * Would be split into 2 parts as follows (in hex, with user data header)<br>
+     *   050003CC020101020304...85&lt;byte 134&gt;<br>
+     *   050003CC020287888990<br>
+     * <br>
+     * http://en.wikipedia.org/wiki/Concatenated_SMS
+     *
+     * @param binaryShortMessage The 8-bit binary short message to create the
+     *      concatenated short messages from.
+     * @param referenceNum The CSMS reference number that will be used in the
+     *      user data header.
+     * @return NULL if the binaryShortMessage does not need concatenated or
+     *      an array of byte arrays representing each chunk (including UDH).
+     * @throws IllegalArgumentException
+     */
+    private byte[][] createConcatenatedBinaryShortMessages(byte[] binaryShortMessage, byte referenceNum) throws IllegalArgumentException {
+        if (binaryShortMessage == null) {
+            return null;
         }
-        
-        return totalsegments;
-    }
+        // if the short message does not need to be concatenated
+        if (binaryShortMessage.length <= 140) {
+            return null;
+        }
 
-    /** 
-     * split short message into segments
-     * 
-     * @param message -- short message
-     * @param segmentMaxSize -- maximum size of each segment of the long short message
-     * @param totalSegments -- total number of segments
-     * @return short message segment string array
-     **/
-    public String[] splitShortMessageIntoSegments(String message, int segmentMaxSize, int totalSegments)
-    {
-        String[] segmentData = new String[totalSegments];
-        
-        if (totalSegments > 1)
-        {
-            int splitPos = segmentMaxSize;
+        // since the UDH will be 6 bytes, we'll split the data into chunks of 134
+        int numParts = (int) (binaryShortMessage.length / 134) + (binaryShortMessage.length % 134 != 0 ? 1 : 0);
+        //logger.debug("numParts=" + numParts);
 
-            int startIndex = 0;
+        byte[][] shortMessageParts = new byte[numParts][];
 
-            segmentData[startIndex] = new String();
-            segmentData[startIndex] = message.substring(startIndex, splitPos);
-
-            for (int i = 1; i < totalSegments; i++)
-            {
-                segmentData[i] = new String();
-                startIndex = splitPos;
-                
-                if (message.length() - startIndex <= segmentMaxSize)
-                {
-                    segmentData[i] = message.substring(startIndex, message.length());
-                }
-                
-                else
-                {
-                    splitPos = startIndex + segmentMaxSize;
-                    segmentData[i] = message.substring(startIndex, splitPos);
-                }
+        for (int i = 0; i < numParts; i++) {
+            // default this part length to max of 134
+            int shortMessagePartLength = 134;
+            if ((i + 1) == numParts) {
+                // last part (only need to add remainder)
+                shortMessagePartLength = binaryShortMessage.length - (i * 134);
             }
+
+            //logger.debug("part " + i + " len: " + shortMessagePartLength);
+
+            // part will be UDH (6 bytes) + length of part
+            byte[] shortMessagePart = new byte[6 + shortMessagePartLength];
+            // Field 1 (1 octet): Length of User Data Header, in this case 05.
+            shortMessagePart[0] = (byte) 0x05;
+            // Field 2 (1 octet): Information Element Identifier, equal to 00 (Concatenated short messages, 8-bit reference number)
+            shortMessagePart[1] = (byte) 0x00;
+            // Field 3 (1 octet): Length of the header, excluding the first two fields; equal to 03
+            shortMessagePart[2] = (byte) 0x03;
+            // Field 4 (1 octet): 00-FF, CSMS reference number, must be same for all the SMS parts in the CSMS
+            shortMessagePart[3] = referenceNum;
+            // Field 5 (1 octet): 00-FF, total number of parts. The value shall remain constant for every short message which makes up the concatenated short message. If the value is zero then the receiving entity shall ignore the whole information element
+            shortMessagePart[4] = (byte) numParts;
+            // Field 6 (1 octet): 00-FF, this part's number in the sequence. The value shall start at 1 and increment for every short message which makes up the concatenated short message. If the value is zero or greater than the value in Field 5 then the receiving entity shall ignore the whole information element. [ETSI Specification: GSM 03.40 Version 5.3.0: July 1996]
+            shortMessagePart[5] = (byte) (i + 1);
+
+            // copy this part's user data onto the end
+            System.arraycopy(binaryShortMessage, (i * 134), shortMessagePart, 6, shortMessagePartLength);
+            shortMessageParts[i] = shortMessagePart;
         }
-        
-        return segmentData;
+
+        return shortMessageParts;
     }
 }
