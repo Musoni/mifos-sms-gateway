@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import com.google.common.collect.Lists;
+
 @Service
 public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessageService {
 	private final SmsOutboundMessageRepository smsOutboundMessageRepository;
@@ -26,37 +28,41 @@ public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessa
 	@Override
 	public List<SmsOutboundMessageResponseData> create(List<SmsOutboundMessage> smsOutboundMessages) {
 		
-		Iterator<SmsOutboundMessage> iterator = smsOutboundMessages.iterator();
+	    List<List<SmsOutboundMessage>> smsOutboundMessagePartitionList = Lists.partition(smsOutboundMessages, 500);
 		List<SmsOutboundMessageResponseData> smsOutboundMessagesResponseData = new ArrayList<>();
 		
-		while(iterator.hasNext()) {
-			SmsOutboundMessage smsOutboundMessage = iterator.next();
-			
-			// check if message object has values for mandatory parameters
-			if(!StringUtils.isEmpty(smsOutboundMessage.getInternalId()) && 
-					!StringUtils.isEmpty(smsOutboundMessage.getMifosTenantIdentifier()) && 
-					!StringUtils.isEmpty(smsOutboundMessage.getSourceAddress()) && 
-					!StringUtils.isEmpty(smsOutboundMessage.getMobileNumber()) && 
-					!StringUtils.isEmpty(smsOutboundMessage.getMessage())) {
-				
-				// set "addedOnDate" to today
-				smsOutboundMessage.setAddedOnDate(new Date());
-				
-				// insert to the sms outbound message into the "smsOutboundMessage" table
-				smsOutboundMessageRepository.save(smsOutboundMessage);
-				
-				// add a response data object to the "SmsOutboundMessageResponseData" list
-				smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
-						smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate().toString(), null, 
-						smsOutboundMessage.getDeliveryStatus(), false, null));
-			}
-			
-			else {
-				// validation errors exist
-				// add a response data object to the "SmsOutboundMessageResponseData" list
-				smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
-						smsOutboundMessage.getId(), null, null, null, true, "Missing value for one or more mandatory parameters"));
-			}
+		for (List<SmsOutboundMessage> smsOutboundMessagePartition : smsOutboundMessagePartitionList) {
+		    Iterator<SmsOutboundMessage> iterator = smsOutboundMessagePartition.iterator();
+		    
+		    while(iterator.hasNext()) {
+	            SmsOutboundMessage smsOutboundMessage = iterator.next();
+	            
+	            // check if message object has values for mandatory parameters
+	            if(!StringUtils.isEmpty(smsOutboundMessage.getInternalId()) && 
+	                    !StringUtils.isEmpty(smsOutboundMessage.getMifosTenantIdentifier()) && 
+	                    !StringUtils.isEmpty(smsOutboundMessage.getSourceAddress()) && 
+	                    !StringUtils.isEmpty(smsOutboundMessage.getMobileNumber()) && 
+	                    !StringUtils.isEmpty(smsOutboundMessage.getMessage())) {
+	                
+	                // set "addedOnDate" to today
+	                smsOutboundMessage.setAddedOnDate(new Date());
+	                
+	                // insert to the sms outbound message into the "smsOutboundMessage" table
+	                smsOutboundMessageRepository.save(smsOutboundMessage);
+	                
+	                // add a response data object to the "SmsOutboundMessageResponseData" list
+	                smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
+	                        smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate().toString(), null, 
+	                        smsOutboundMessage.getDeliveryStatus(), false, null));
+	            }
+	            
+	            else {
+	                // validation errors exist
+	                // add a response data object to the "SmsOutboundMessageResponseData" list
+	                smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
+	                        smsOutboundMessage.getId(), null, null, null, true, "Missing value for one or more mandatory parameters"));
+	            }
+	        }
 		}
 		
 		return smsOutboundMessagesResponseData;
