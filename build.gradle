@@ -22,6 +22,11 @@ buildscript {
     }
 }
 
+/* define the valid syntax level for source files */
+sourceCompatibility = JavaVersion.VERSION_1_7
+/* define binary compatibility version */
+targetCompatibility = JavaVersion.VERSION_1_7
+
 dependencies {
 	def springVersion = '3.2.5.RELEASE'
 	def jerseyVersion = '1.17'
