@@ -95,7 +95,7 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		}
 		
 		else {
-		    logger.warn("SEND MESSAGES SCHEDULER IS DISABLED ON THIS SERVER INSTANCE");
+		    //logger.warn("SEND MESSAGES SCHEDULER IS DISABLED ON THIS SERVER INSTANCE");
 		}
 	}
 	
