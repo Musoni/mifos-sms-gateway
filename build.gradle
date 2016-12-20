@@ -64,6 +64,7 @@ dependencies {
     compile "com.googlecode.jsmpp:jsmpp:2.1.0"
     compile "joda-time:joda-time:2.7"
     compile "com.google.guava:guava:18.0"
+    compile "org.apache.commons:commons-lang3:3.4"
 }
 
 tomcatRunWar {
