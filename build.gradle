@@ -28,9 +28,9 @@ sourceCompatibility = JavaVersion.VERSION_1_7
 targetCompatibility = JavaVersion.VERSION_1_7
 
 dependencies {
-	def springVersion = '3.2.5.RELEASE'
+	def springVersion = '4.0.7.RELEASE'
 	def jerseyVersion = '1.17'
-	def tomcatVersion = '7.0.47'
+	def tomcatVersion = '7.0.54'
 	def slf4jVersion = '1.7.5'
 	def hibernateVersion = '4.1.9.Final'
 	def logbackVersion = '1.0.13'
