@@ -8,7 +8,7 @@ import org.mifos.sms.data.ConfigurationData;
  * Class methods each return an SMS gateway configuration property stored in the "configuration" table 
  **/
 public class SmsGatewayConfiguration {
-	private Boolean developmentMode;
+	private Boolean debugMode;
 	private String systemId;
 	private String hostname;
 	private Integer portNumber;
@@ -34,7 +34,7 @@ public class SmsGatewayConfiguration {
 		    if (configurationData.getValue() != null) {
     		    switch (configurationData.getName()) {
     		        case DEVELOPMENT_MODE:
-    		            this.developmentMode = Boolean.valueOf(configurationData.getValue());
+    		            this.debugMode = Boolean.valueOf(configurationData.getValue());
     		            break;
     		            
     		        case SMS_GATEWAY_SYSTEM_ID:
@@ -61,11 +61,13 @@ public class SmsGatewayConfiguration {
 		}
 	}
 	
-	/** 
-	 * @return SMS gateway configuration "development mode" property 
-	 **/
-	public Boolean getDevelopmentMode() {
-		return developmentMode;
+	/**
+	 * Returns true if the "debugMode" property is set to true, else false
+	 * 
+	 * @return true if the "debugMode" property is set to true, else false
+	 */
+	public Boolean inDebugMode() {
+	    return debugMode;
 	}
 	
 	/** 
@@ -99,7 +101,7 @@ public class SmsGatewayConfiguration {
 	/** 
 	 * @return SMS gateway configuration "enable outbound message schedule" property 
 	 **/
-	public Boolean getEnableOutboundMessageScheduler() {
+	public Boolean outboundMessageSchedulerIsEnabled() {
 		return enableOutboundMessageScheduler;
 	}
 }

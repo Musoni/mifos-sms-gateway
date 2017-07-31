@@ -14,7 +14,10 @@
     	http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-3.0.xsd">
 	
 	<tx:annotation-driven />
-	<task:annotation-driven />
+	
+	<task:annotation-driven executor="taskExecutor" scheduler="taskScheduler"/>
+	<task:executor id="taskExecutor" pool-size="5" queue-capacity="25"/>
+	<task:scheduler id="taskScheduler" pool-size="10"/>
 	
 	<context:component-scan
 		base-package="org.mifos.sms.*">

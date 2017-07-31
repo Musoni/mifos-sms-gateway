@@ -5,13 +5,24 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
-import org.mifos.sms.gateway.infobip.SmsGatewayHelper;
+import org.apache.commons.lang3.StringUtils;
+import org.mifos.sms.data.ConfigurationData;
+import org.mifos.sms.domain.SmsMessageStatusType;
+import org.mifos.sms.domain.SmsOutboundMessage;
+import org.mifos.sms.domain.SmsOutboundMessageRepository;
+import org.mifos.sms.gateway.infobip.SmsGatewayConfiguration;
+import org.mifos.sms.gateway.infobip.SmsGatewayDeliveryReport;
 import org.mifos.sms.gateway.infobip.SmsGatewayImpl;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
+import org.mifos.sms.service.ReadConfigurationService;
+import org.mifos.sms.service.SmppSessionLifecycle;
+import org.mifos.sms.smpp.session.SmppSessionFactoryBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,37 +31,45 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.apache.commons.lang3.StringUtils;
-import org.mifos.sms.domain.SmsMessageStatusType;
-import org.mifos.sms.domain.SmsOutboundMessage;
-import org.mifos.sms.domain.SmsOutboundMessageRepository;
 
 @Service
 public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMessageScheduledJobService {
     private final SmsOutboundMessageRepository smsOutboundMessageRepository;
     private final SmsGatewayImpl smsGatewayImpl;
-    private final SmsGatewayHelper smsGatewayHelper;
     private final static Logger logger = LoggerFactory.getLogger(SmsOutboundMessageScheduledJobServiceImpl.class);
+    private final ReadConfigurationService readConfigurationService;
+    private final SmsGatewayConfiguration smsGatewayConfiguration;
+    private final SmppSessionFactoryBean smppSessionFactoryBean;
+    private final SmppSessionLifecycle smppSessionLifecycle;
     
     @Autowired
     public SmsOutboundMessageScheduledJobServiceImpl(SmsOutboundMessageRepository smsOutboundMessageRepository,
-    		SmsGatewayHelper smsGatewayHelper,
-    		SmsGatewayImpl smsGatewayImpl) {
+    		final ReadConfigurationService readConfigurationService) {
+        this.readConfigurationService = readConfigurationService;
+        
+        final Collection<ConfigurationData> configurationDataCollection = this.readConfigurationService.findAll();
+        
+        smsGatewayConfiguration = new SmsGatewayConfiguration(configurationDataCollection);
+        
     	this.smsOutboundMessageRepository = smsOutboundMessageRepository;
-    	this.smsGatewayHelper = smsGatewayHelper;
-    	this.smsGatewayImpl = smsGatewayImpl;
-    	this.smsGatewayHelper.connectAndBindSession();
+    	
+    	this.smppSessionFactoryBean = new SmppSessionFactoryBean(smsGatewayConfiguration);
+    	
+    	this.smsGatewayImpl = new SmsGatewayImpl(smppSessionFactoryBean);
+    	
+    	this.smppSessionLifecycle = smppSessionFactoryBean.getSmppSessionLifecycle();
     }
 
 	@Override
 	@Transactional
 	@Scheduled(fixedDelay = 60000)
 	public void sendMessages() {
-		// check if the scheduler is enabled
-		if(smsGatewayHelper.smsGatewayConfiguration.getEnableOutboundMessageScheduler() && 
+	    
+	    // check if the scheduler is enabled
+		if(smsGatewayConfiguration.outboundMessageSchedulerIsEnabled() && 
 		        this.isSchedulerEnabledInSmsGatewayPropertiesFile()) {
-			
-			if(smsGatewayHelper.isConnected) {
+		    
+		    if(smppSessionLifecycle.isActive()) {
 				Pageable pageable = new PageRequest(0, getMaximumNumberOfMessagesToBeSent());
 				List<SmsOutboundMessage> smsOutboundMessages = smsOutboundMessageRepository.findByDeliveryStatus(SmsMessageStatusType.PENDING.getValue(), pageable);
 				
@@ -76,9 +95,8 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		                    
 		                    // update the status of the SMS message in the DB
 		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.SENT);
-		                }
-		                
-		                else {
+		                    
+		                } else {
 		                    // update the status of the SMS message in the DB
 		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.FAILED);
 		                }
@@ -86,16 +104,11 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		                smsOutboundMessageRepository.save(smsOutboundMessage);
 		            }
 		        }
+		        
+			} else {
+			    // reconnect
+			    smppSessionLifecycle.restartSmppSession();
 			}
-			
-			else {
-				// reconnect
-				smsGatewayHelper.reconnectAndBindSession();
-			}
-		}
-		
-		else {
-		    //logger.warn("SEND MESSAGES SCHEDULER IS DISABLED ON THIS SERVER INSTANCE");
 		}
 	}
 	
@@ -132,24 +145,16 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
             if (StringUtils.isNoneBlank(scheduleDotEnablePropertyValue)) {
                 isEnabled = Boolean.parseBoolean(scheduleDotEnablePropertyValue); 
             }
-        } 
-        
-        catch (FileNotFoundException ex) {
-            // isEnabled = true;
-        }
-
-        catch (IOException ex) {
+            
+        } catch (FileNotFoundException ex) { } catch (IOException ex) {
             logger.error(ex.getMessage(), ex);
-        }
-
-
-        finally {
+            
+        } finally {
             if (quartzPropertiesInputStream != null) {
                 try {
                     quartzPropertiesInputStream.close();
-                } 
-                
-                catch (IOException e) {
+                    
+                }  catch (IOException e) {
                     logger.error(e.getMessage(), e);
                 }
             }
@@ -166,4 +171,66 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 	private int getMaximumNumberOfMessagesToBeSent() {
 		return 5000;
 	}
+
+    @Override
+    @Transactional
+    @Scheduled(fixedDelay = 60000)
+    public void processSmsGatewayDeliveryReports() {
+        if (this.isSchedulerEnabledInSmsGatewayPropertiesFile()) {
+            Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
+            
+            if(smppSessionLifecycle.isActive()) {
+                if (smsGatewayDeliveryReportMap != null) {
+                    
+                    for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
+                        smsGatewayDeliveryReportMap.entrySet()) {
+                        String messageId = smsGatewayDeliveryReportEntry.getKey();
+                        SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
+                        
+                        // get the SmsMessage object from the DB
+                        SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
+                        
+                        if(smsOutboundMessage != null) {
+                            // update the status of the SMS message
+                            smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
+                            
+                            switch(smsGatewayDeliveryReport.getStatus()) {
+                                case DELIVERED:
+                                    // update the delivery date of the SMS message
+                                    smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
+                                    break;
+                                    
+                                default:
+                                    break;
+                            }
+                            
+                            // save the "SmsOutboundMessage" entity
+                            smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
+                            
+                            // remove the delivery report from the map
+                            smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
+                            
+                            logger.info("SMS message with external ID '" + messageId
+                                    + "' successfully updated. Status set to: " + smsOutboundMessage.
+                                    getDeliveryStatus().toString());
+                        } else {
+                            try {
+                                logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
+                                        + messageId + "', will retry again after 5 seconds");
+                                
+                                // sleep for 5 seconds
+                                Thread.sleep(5000L);
+                                
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+                
+            } else {
+                this.smppSessionLifecycle.restartSmppSession();
+            }
+        }
+    }
 }

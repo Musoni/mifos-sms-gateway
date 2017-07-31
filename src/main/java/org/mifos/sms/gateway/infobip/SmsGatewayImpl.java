@@ -1,27 +1,24 @@
 package org.mifos.sms.gateway.infobip;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.mifos.sms.smpp.session.SmppSessionFactoryBean;
 
 /** 
  * Infobip SMS gateway services is use in sending out sms messages.
  * More information - http://www.infobip.com/messaging/wholesale/apis/ 
  **/
-@Service
 public class SmsGatewayImpl implements SmsGateway {
-	private final SmsGatewayHelper smsGatewayHelper;
+    private final SmppSessionFactoryBean smppSessionFactoryBean;
 	
 	/** 
 	 * SmsGatewayImpl constructor
 	 * 
 	 * @return void 
 	 **/
-	@Autowired
-	public SmsGatewayImpl(final SmsGatewayHelper smsGatewayHelper) {
-		this.smsGatewayHelper = smsGatewayHelper;
+	public SmsGatewayImpl(final SmppSessionFactoryBean smppSessionFactoryBean) {
+		this.smppSessionFactoryBean = smppSessionFactoryBean;
 	}
 
 	@Override
@@ -30,7 +27,7 @@ public class SmsGatewayImpl implements SmsGateway {
 		
 		if(smsGatewayMessages.size() > 0) {
 			for(SmsGatewayMessage smsGatewayMessage : smsGatewayMessages) {
-				sentSmsGatewayMessages.add(smsGatewayHelper.submitShortMessage(smsGatewayMessage));
+				sentSmsGatewayMessages.add(smppSessionFactoryBean.submitShortMessage(smsGatewayMessage));
 			}
 		}
 		
@@ -39,6 +36,6 @@ public class SmsGatewayImpl implements SmsGateway {
 
 	@Override
 	public SmsGatewayMessage sendMessage(SmsGatewayMessage smsGatewayMessage) {
-		return smsGatewayHelper.submitShortMessage(smsGatewayMessage);
+		return smppSessionFactoryBean.submitShortMessage(smsGatewayMessage);
 	}
 }
