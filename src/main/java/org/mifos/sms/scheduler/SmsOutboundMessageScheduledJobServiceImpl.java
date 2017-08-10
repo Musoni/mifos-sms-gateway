@@ -176,61 +176,59 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
     @Transactional
     @Scheduled(fixedDelay = 60000)
     public void processSmsGatewayDeliveryReports() {
-        if (this.isSchedulerEnabledInSmsGatewayPropertiesFile()) {
-            Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
-            
-            if(smppSessionLifecycle.isActive()) {
-                if (smsGatewayDeliveryReportMap != null) {
+        Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
+        
+        if(smppSessionLifecycle.isActive()) {
+            if (smsGatewayDeliveryReportMap != null) {
+                
+                for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
+                    smsGatewayDeliveryReportMap.entrySet()) {
+                    String messageId = smsGatewayDeliveryReportEntry.getKey();
+                    SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
                     
-                    for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
-                        smsGatewayDeliveryReportMap.entrySet()) {
-                        String messageId = smsGatewayDeliveryReportEntry.getKey();
-                        SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
+                    // get the SmsMessage object from the DB
+                    SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
+                    
+                    if(smsOutboundMessage != null) {
+                        // update the status of the SMS message
+                        smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
                         
-                        // get the SmsMessage object from the DB
-                        SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
+                        switch(smsGatewayDeliveryReport.getStatus()) {
+                            case DELIVERED:
+                                // update the delivery date of the SMS message
+                                smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
+                                break;
+                                
+                            default:
+                                break;
+                        }
                         
-                        if(smsOutboundMessage != null) {
-                            // update the status of the SMS message
-                            smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
+                        // save the "SmsOutboundMessage" entity
+                        smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
+                        
+                        // remove the delivery report from the map
+                        smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
+                        
+                        logger.info("SMS message with external ID '" + messageId
+                                + "' successfully updated. Status set to: " + smsOutboundMessage.
+                                getDeliveryStatus().toString());
+                    } else {
+                        try {
+                            logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
+                                    + messageId + "', will retry again after 5 seconds");
                             
-                            switch(smsGatewayDeliveryReport.getStatus()) {
-                                case DELIVERED:
-                                    // update the delivery date of the SMS message
-                                    smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
-                                    break;
-                                    
-                                default:
-                                    break;
-                            }
+                            // sleep for 5 seconds
+                            Thread.sleep(5000L);
                             
-                            // save the "SmsOutboundMessage" entity
-                            smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
-                            
-                            // remove the delivery report from the map
-                            smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
-                            
-                            logger.info("SMS message with external ID '" + messageId
-                                    + "' successfully updated. Status set to: " + smsOutboundMessage.
-                                    getDeliveryStatus().toString());
-                        } else {
-                            try {
-                                logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
-                                        + messageId + "', will retry again after 5 seconds");
-                                
-                                // sleep for 5 seconds
-                                Thread.sleep(5000L);
-                                
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
                         }
                     }
                 }
-                
-            } else {
-                this.smppSessionLifecycle.restartSmppSession();
             }
+            
+        } else {
+            this.smppSessionLifecycle.restartSmppSession();
         }
     }
 }
