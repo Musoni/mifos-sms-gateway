@@ -35,12 +35,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMessageScheduledJobService {
     private final SmsOutboundMessageRepository smsOutboundMessageRepository;
-    private final SmsGatewayImpl smsGatewayImpl;
+    private SmsGatewayImpl smsGatewayImpl;
     private final static Logger logger = LoggerFactory.getLogger(SmsOutboundMessageScheduledJobServiceImpl.class);
     private final ReadConfigurationService readConfigurationService;
     private final SmsGatewayConfiguration smsGatewayConfiguration;
-    private final SmppSessionFactoryBean smppSessionFactoryBean;
-    private final SmppSessionLifecycle smppSessionLifecycle;
+    private SmppSessionFactoryBean smppSessionFactoryBean;
+    private SmppSessionLifecycle smppSessionLifecycle;
     
     @Autowired
     public SmsOutboundMessageScheduledJobServiceImpl(SmsOutboundMessageRepository smsOutboundMessageRepository,
@@ -53,11 +53,11 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
         
     	this.smsOutboundMessageRepository = smsOutboundMessageRepository;
     	
-    	this.smppSessionFactoryBean = new SmppSessionFactoryBean(smsGatewayConfiguration);
-    	
-    	this.smsGatewayImpl = new SmsGatewayImpl(smppSessionFactoryBean);
-    	
-    	this.smppSessionLifecycle = smppSessionFactoryBean.getSmppSessionLifecycle();
+    	if (this.isSmppEnabledInSmsGatewayPropertiesFile()) {
+    	    this.smppSessionFactoryBean = new SmppSessionFactoryBean(smsGatewayConfiguration);
+            this.smsGatewayImpl = new SmsGatewayImpl(smppSessionFactoryBean);
+            this.smppSessionLifecycle = smppSessionFactoryBean.getSmppSessionLifecycle();
+    	}
     }
 
 	@Override
@@ -67,7 +67,8 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 	    
 	    // check if the scheduler is enabled
 		if(smsGatewayConfiguration.outboundMessageSchedulerIsEnabled() && 
-		        this.isSchedulerEnabledInSmsGatewayPropertiesFile()) {
+		        this.isSchedulerEnabledInSmsGatewayPropertiesFile() && 
+		        this.isSmppEnabledInSmsGatewayPropertiesFile()) {
 		    
 		    if(smppSessionLifecycle.isActive()) {
 				Pageable pageable = new PageRequest(0, getMaximumNumberOfMessagesToBeSent());
@@ -110,6 +111,52 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 			    smppSessionLifecycle.restartSmppSession();
 			}
 		}
+	}
+	
+	private boolean isSmppEnabledInSmsGatewayPropertiesFile() {
+	    // smpp is disabled by default
+        boolean isEnabled = false;
+        Properties properties = new Properties();
+        InputStream propertiesInputStream = null;
+        File catalinaBaseConfDirectory = null;
+        File propertiesFile = null;
+        String smppDotEnablePropertyValue = null;
+        
+        try {
+            // create a new File instance for the catalina base conf directory
+            catalinaBaseConfDirectory = new File(System.getProperty("catalina.base"), "conf");
+            
+            // create a new File instance for the properties file
+            propertiesFile = new File(catalinaBaseConfDirectory, "sms-gateway.properties");
+            
+            // create file inputstream to the properties file
+            propertiesInputStream = new FileInputStream(propertiesFile);
+            
+            // read property list from input stream 
+            properties.load(propertiesInputStream);
+            
+            smppDotEnablePropertyValue = properties.getProperty("smpp.enabled");
+            
+            // make sure it isn't blank, before trying to parse the string as boolean
+            if (StringUtils.isNoneBlank(smppDotEnablePropertyValue)) {
+                isEnabled = Boolean.parseBoolean(smppDotEnablePropertyValue); 
+            }
+            
+        } catch (FileNotFoundException ex) { } catch (IOException ex) {
+            logger.error(ex.getMessage(), ex);
+            
+        } finally {
+            if (propertiesInputStream != null) {
+                try {
+                    propertiesInputStream.close();
+                    
+                }  catch (IOException e) {
+                    logger.error(e.getMessage(), e);
+                }
+            }
+        }
+        
+        return isEnabled;
 	}
 	
 	/**
@@ -176,59 +223,61 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
     @Transactional
     @Scheduled(fixedDelay = 60000)
     public void processSmsGatewayDeliveryReports() {
-        Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
-        
-        if(smppSessionLifecycle.isActive()) {
-            if (smsGatewayDeliveryReportMap != null) {
-                
-                for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
-                    smsGatewayDeliveryReportMap.entrySet()) {
-                    String messageId = smsGatewayDeliveryReportEntry.getKey();
-                    SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
+        if (this.isSmppEnabledInSmsGatewayPropertiesFile()) {
+            Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
+            
+            if(smppSessionLifecycle.isActive()) {
+                if (smsGatewayDeliveryReportMap != null) {
                     
-                    // get the SmsMessage object from the DB
-                    SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
-                    
-                    if(smsOutboundMessage != null) {
-                        // update the status of the SMS message
-                        smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
+                    for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
+                        smsGatewayDeliveryReportMap.entrySet()) {
+                        String messageId = smsGatewayDeliveryReportEntry.getKey();
+                        SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
                         
-                        switch(smsGatewayDeliveryReport.getStatus()) {
-                            case DELIVERED:
-                                // update the delivery date of the SMS message
-                                smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
-                                break;
+                        // get the SmsMessage object from the DB
+                        SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
+                        
+                        if(smsOutboundMessage != null) {
+                            // update the status of the SMS message
+                            smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
+                            
+                            switch(smsGatewayDeliveryReport.getStatus()) {
+                                case DELIVERED:
+                                    // update the delivery date of the SMS message
+                                    smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
+                                    break;
+                                    
+                                default:
+                                    break;
+                            }
+                            
+                            // save the "SmsOutboundMessage" entity
+                            smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
+                            
+                            // remove the delivery report from the map
+                            smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
+                            
+                            logger.info("SMS message with external ID '" + messageId
+                                    + "' successfully updated. Status set to: " + smsOutboundMessage.
+                                    getDeliveryStatus().toString());
+                        } else {
+                            try {
+                                logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
+                                        + messageId + "', will retry again after 5 seconds");
                                 
-                            default:
-                                break;
-                        }
-                        
-                        // save the "SmsOutboundMessage" entity
-                        smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
-                        
-                        // remove the delivery report from the map
-                        smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
-                        
-                        logger.info("SMS message with external ID '" + messageId
-                                + "' successfully updated. Status set to: " + smsOutboundMessage.
-                                getDeliveryStatus().toString());
-                    } else {
-                        try {
-                            logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
-                                    + messageId + "', will retry again after 5 seconds");
-                            
-                            // sleep for 5 seconds
-                            Thread.sleep(5000L);
-                            
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
+                                // sleep for 5 seconds
+                                Thread.sleep(5000L);
+                                
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }
+                
+            } else {
+                this.smppSessionLifecycle.restartSmppSession();
             }
-            
-        } else {
-            this.smppSessionLifecycle.restartSmppSession();
         }
     }
 }
