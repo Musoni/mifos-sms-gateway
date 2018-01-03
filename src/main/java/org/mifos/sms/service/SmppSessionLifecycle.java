@@ -244,8 +244,8 @@ public class SmppSessionLifecycle implements SmartLifecycle {
                     }
                     
                     final SmsDeliveryStatus smsDeliveryStatus = SmsDeliveryStatus.instance(deliveryReceipt.getFinalStatus());
-                    final SmsDeliveryReport smsDeliveryReport = SmsDeliveryReport.instance(messageId, deliveryReceipt.getSubmitDate(), 
-                            deliveryReceipt.getDoneDate(), smsDeliveryStatus.getId(), deliveryReceipt.getError());
+                    final SmsDeliveryReport smsDeliveryReport = SmsDeliveryReport.instance(messageId, deliveryReceipt.getDoneDate(), 
+                            deliveryReceipt.getSubmitDate(), smsDeliveryStatus.getId(), deliveryReceipt.getError());
                     
                     // add new delivery report to queue
                     smsDeliveryReportRepository.save(smsDeliveryReport);
