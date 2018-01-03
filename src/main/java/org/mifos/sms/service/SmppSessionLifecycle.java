@@ -1,8 +1,5 @@
 package org.mifos.sms.service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.jsmpp.bean.AlertNotification;
 import org.jsmpp.bean.DataSm;
 import org.jsmpp.bean.DeliverSm;
@@ -17,9 +14,10 @@ import org.jsmpp.session.SMPPSession;
 import org.jsmpp.session.Session;
 import org.jsmpp.session.SessionStateListener;
 import org.jsmpp.util.InvalidDeliveryReceiptException;
-import org.mifos.sms.domain.SmsMessageStatusType;
+import org.mifos.sms.data.SmsDeliveryStatus;
+import org.mifos.sms.domain.SmsDeliveryReport;
+import org.mifos.sms.domain.SmsDeliveryReportRepository;
 import org.mifos.sms.gateway.infobip.SmsGatewayConfiguration;
-import org.mifos.sms.gateway.infobip.SmsGatewayDeliveryReport;
 import org.mifos.sms.smpp.session.SmppSessionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,21 +28,23 @@ public class SmppSessionLifecycle implements SmartLifecycle {
     private SMPPSession session;
     private volatile Boolean reconnect = true;
     private volatile Boolean isReconnecting = false;
-    private final Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = new ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(SmppSessionLifecycle.class);
     private final SmppSessionProperties smppSessionProperties;
     private final SmsGatewayConfiguration smsGatewayConfiguration;
     private final long reconnectInterval = 10000L; // 10 seconds
     private static SmppSessionLifecycle instance;
     private final int reconnectionAttemptLimit = 20;
+    private final SmsDeliveryReportRepository smsDeliveryReportRepository;
     
     /**
      * @param session
      */
     public SmppSessionLifecycle(final SmppSessionProperties smppSessionProperties, 
-            final SmsGatewayConfiguration smsGatewayConfiguration) {
+            final SmsGatewayConfiguration smsGatewayConfiguration, 
+            final SmsDeliveryReportRepository smsDeliveryReportRepository) {
         this.smppSessionProperties = smppSessionProperties;
         this.smsGatewayConfiguration = smsGatewayConfiguration;
+        this.smsDeliveryReportRepository = smsDeliveryReportRepository;
         
         instance = this;
         
@@ -190,35 +190,6 @@ public class SmppSessionLifecycle implements SmartLifecycle {
 
     @Override
     public void stop(Runnable callback) { }
-    
-    /**
-     * Add delivery report to map
-     * 
-     * @param messageId
-     * @param smsGatewayDeliveryReport
-     */
-    public void addToSmsGatewayDeliveryReportMap(final String messageId, 
-            final SmsGatewayDeliveryReport smsGatewayDeliveryReport) {
-        this.smsGatewayDeliveryReportMap.put(messageId, smsGatewayDeliveryReport);
-    }
-    
-    /**
-     * Remove the delivery report from the map
-     * 
-     * @param messageId
-     */
-    public void removeFromSmsGatewayDeliveryReportMap(final String messageId) {
-        this.smsGatewayDeliveryReportMap.remove(messageId);
-    }
-    
-    /**
-     * Returns the delivery report map
-     * 
-     * @return the smsGatewayDeliveryReportMap
-     */
-    public Map<String, SmsGatewayDeliveryReport> getSmsGatewayDeliveryReportMap() {
-        return this.smsGatewayDeliveryReportMap;
-    }
 
     /**
      * @return the session
@@ -272,38 +243,15 @@ public class SmppSessionLifecycle implements SmartLifecycle {
                         messageId = Long.toString(Long.parseLong(deliveryReceipt.getId()) & 0xffffffff, 16);
                     }
                     
-                    SmsMessageStatusType messageStatus = null;
+                    final SmsDeliveryStatus smsDeliveryStatus = SmsDeliveryStatus.instance(deliveryReceipt.getFinalStatus());
+                    final SmsDeliveryReport smsDeliveryReport = SmsDeliveryReport.instance(messageId, deliveryReceipt.getSubmitDate(), 
+                            deliveryReceipt.getDoneDate(), smsDeliveryStatus.getId(), deliveryReceipt.getError());
                     
-                    switch(deliveryReceipt.getFinalStatus()) {
-                        case DELIVRD:
-                            messageStatus = SmsMessageStatusType.DELIVERED;
-                            break;
-                            
-                        case REJECTD:
-                        case EXPIRED:
-                        case UNDELIV:
-                            // rejected, expired and undelivered are grouped as failed 
-                            messageStatus = SmsMessageStatusType.FAILED;
-                            break;
-                            
-                        default:
-                            // in all other cases the status is invalid
-                            messageStatus = SmsMessageStatusType.INVALID;
-                            break;
-                    }
+                    // add new delivery report to queue
+                    smsDeliveryReportRepository.save(smsDeliveryReport);
                     
-                    // create a new SmsGatewayDeliveryReport object with data received from the SMS gateway
-                    SmsGatewayDeliveryReport smsGatewayDeliveryReport = new SmsGatewayDeliveryReport(messageId, deliveryReceipt.getSubmitDate(), deliveryReceipt.getDoneDate(), messageStatus);
-                    
-                    // get the map of delivery reports from stash
-                    Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = getSmsGatewayDeliveryReportMap();
-                    
-                    if (smsGatewayDeliveryReportMap != null) {
-                        addToSmsGatewayDeliveryReportMap(messageId, smsGatewayDeliveryReport);
-                        
-                        // log success message
-                        logger.info("Receiving delivery report for message '" + messageId + "' : " + smsGatewayDeliveryReport.toString());
-                    }
+                    // log success message
+                    logger.info("Receiving delivery report for message '" + messageId + "' : " + deliveryReceipt.toString());
                } 
                
                catch (InvalidDeliveryReceiptException e) {

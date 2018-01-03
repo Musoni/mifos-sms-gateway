@@ -16,6 +16,7 @@ import org.jsmpp.extra.ResponseTimeoutException;
 import org.jsmpp.session.SMPPSession;
 import org.jsmpp.util.StringParameter;
 import org.mifos.sms.data.SmsShortMessage;
+import org.mifos.sms.domain.SmsDeliveryReportRepository;
 import org.mifos.sms.gateway.infobip.SmsGatewayConfiguration;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
 import org.mifos.sms.helper.Gsm0338;
@@ -51,11 +52,12 @@ public class SmppSessionFactoryBean {
     /**
      * @param smsGatewayConfiguration
      */
-    public SmppSessionFactoryBean(final SmsGatewayConfiguration smsGatewayConfiguration) {
+    public SmppSessionFactoryBean(final SmsGatewayConfiguration smsGatewayConfiguration, 
+            final SmsDeliveryReportRepository smsDeliveryReportRepository) {
         this.smppShortMessageProperties = new SmppShortMessageProperties();
         this.smppSessionProperties = new SmppSessionProperties(smsGatewayConfiguration);
         this.smppSessionLifecycle = new SmppSessionLifecycle(smppSessionProperties, 
-                smsGatewayConfiguration);
+                smsGatewayConfiguration, smsDeliveryReportRepository);
         
         // kick start the SMPP session life cycle
         this.smppSessionLifecycle.start();

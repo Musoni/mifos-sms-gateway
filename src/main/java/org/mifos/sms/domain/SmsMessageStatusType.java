@@ -1,5 +1,7 @@
 package org.mifos.sms.domain;
 
+import org.mifos.sms.data.SmsDeliveryStatus;
+
 /** 
  * SMS message delivery status predefined enum constants
  * 
@@ -25,19 +27,34 @@ public enum SmsMessageStatusType {
 
         SmsMessageStatusType enumeration = SmsMessageStatusType.INVALID;
         
-        switch (statusValue) {
-            case 100:
-                enumeration = SmsMessageStatusType.PENDING;
-            break;
-            case 200:
-                enumeration = SmsMessageStatusType.SENT;
-            break;
-            case 300:
+        for (SmsMessageStatusType instance : SmsMessageStatusType.values()) {
+            if (statusValue == instance.value) {
+                enumeration = instance;
+                
+                break;
+            }
+        }
+        
+        return enumeration;
+    }
+    
+    /**
+     * Returns the {@link SmsMessageStatusType} representation of the {@link SmsDeliveryStatus} object
+     * 
+     * @param smsDeliveryStatus
+     * @return {@link SmsDeliveryStatus} object
+     */
+    public static SmsMessageStatusType instance(final SmsDeliveryStatus smsDeliveryStatus) {
+        SmsMessageStatusType enumeration = SmsMessageStatusType.INVALID;
+        
+        switch (smsDeliveryStatus) {
+            case DELIVERED:
                 enumeration = SmsMessageStatusType.DELIVERED;
-            break;
-            case 400:
+                break;
+        
+            default:
                 enumeration = SmsMessageStatusType.FAILED;
-            break;
+                break;
         }
         
         return enumeration;

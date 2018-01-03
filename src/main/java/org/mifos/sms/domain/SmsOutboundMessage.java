@@ -209,7 +209,9 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
      * @return void
      **/
     public void setDeliveryStatus(SmsMessageStatusType deliveryStatus) {
-        this.deliveryStatus = deliveryStatus.getValue();
+        if (deliveryStatus != null) {
+            this.deliveryStatus = deliveryStatus.getValue();
+        }
     }
 	
 	/** 

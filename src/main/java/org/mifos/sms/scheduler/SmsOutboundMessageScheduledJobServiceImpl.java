@@ -8,16 +8,16 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
 import org.mifos.sms.data.ConfigurationData;
+import org.mifos.sms.domain.SmsDeliveryReport;
+import org.mifos.sms.domain.SmsDeliveryReportRepository;
 import org.mifos.sms.domain.SmsMessageStatusType;
 import org.mifos.sms.domain.SmsOutboundMessage;
 import org.mifos.sms.domain.SmsOutboundMessageRepository;
 import org.mifos.sms.gateway.infobip.SmsGatewayConfiguration;
-import org.mifos.sms.gateway.infobip.SmsGatewayDeliveryReport;
 import org.mifos.sms.gateway.infobip.SmsGatewayImpl;
 import org.mifos.sms.gateway.infobip.SmsGatewayMessage;
 import org.mifos.sms.service.ReadConfigurationService;
@@ -26,6 +26,7 @@ import org.mifos.sms.smpp.session.SmppSessionFactoryBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,10 +42,12 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
     private final SmsGatewayConfiguration smsGatewayConfiguration;
     private SmppSessionFactoryBean smppSessionFactoryBean;
     private SmppSessionLifecycle smppSessionLifecycle;
+    private final SmsDeliveryReportRepository smsDeliveryReportRepository;
     
     @Autowired
     public SmsOutboundMessageScheduledJobServiceImpl(SmsOutboundMessageRepository smsOutboundMessageRepository,
-    		final ReadConfigurationService readConfigurationService) {
+    		final ReadConfigurationService readConfigurationService, 
+    		final SmsDeliveryReportRepository smsDeliveryReportRepository) {
         this.readConfigurationService = readConfigurationService;
         
         final Collection<ConfigurationData> configurationDataCollection = this.readConfigurationService.findAll();
@@ -52,9 +55,10 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
         smsGatewayConfiguration = new SmsGatewayConfiguration(configurationDataCollection);
         
     	this.smsOutboundMessageRepository = smsOutboundMessageRepository;
+    	this.smsDeliveryReportRepository = smsDeliveryReportRepository;
     	
     	if (this.isSmppEnabledInSmsGatewayPropertiesFile()) {
-    	    this.smppSessionFactoryBean = new SmppSessionFactoryBean(smsGatewayConfiguration);
+    	    this.smppSessionFactoryBean = new SmppSessionFactoryBean(smsGatewayConfiguration, smsDeliveryReportRepository);
             this.smsGatewayImpl = new SmsGatewayImpl(smppSessionFactoryBean);
             this.smppSessionLifecycle = smppSessionFactoryBean.getSmppSessionLifecycle();
     	}
@@ -224,59 +228,69 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
     @Scheduled(fixedDelay = 60000)
     public void processSmsGatewayDeliveryReports() {
         if (this.isSmppEnabledInSmsGatewayPropertiesFile()) {
-            Map<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportMap = smppSessionLifecycle.getSmsGatewayDeliveryReportMap();
-            
             if(smppSessionLifecycle.isActive()) {
-                if (smsGatewayDeliveryReportMap != null) {
-                    
-                    for (Map.Entry<String, SmsGatewayDeliveryReport> smsGatewayDeliveryReportEntry : 
-                        smsGatewayDeliveryReportMap.entrySet()) {
-                        String messageId = smsGatewayDeliveryReportEntry.getKey();
-                        SmsGatewayDeliveryReport smsGatewayDeliveryReport = smsGatewayDeliveryReportEntry.getValue();
-                        
-                        // get the SmsMessage object from the DB
-                        SmsOutboundMessage smsOutboundMessage = smsOutboundMessageRepository.findByExternalId(messageId);
-                        
-                        if(smsOutboundMessage != null) {
-                            // update the status of the SMS message
-                            smsOutboundMessage.setDeliveryStatus(smsGatewayDeliveryReport.getStatus());
-                            
-                            switch(smsGatewayDeliveryReport.getStatus()) {
-                                case DELIVERED:
-                                    // update the delivery date of the SMS message
-                                    smsOutboundMessage.setDeliveredOnDate(smsGatewayDeliveryReport.getDoneDate());
-                                    break;
-                                    
-                                default:
-                                    break;
-                            }
-                            
-                            // save the "SmsOutboundMessage" entity
-                            smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
-                            
-                            // remove the delivery report from the map
-                            smppSessionLifecycle.removeFromSmsGatewayDeliveryReportMap(messageId);
-                            
-                            logger.info("SMS message with external ID '" + messageId
-                                    + "' successfully updated. Status set to: " + smsOutboundMessage.
-                                    getDeliveryStatus().toString());
-                        } else {
-                            try {
-                                logger.info("Could not retrieve SmsOutboundMessage entity with external ID '"
-                                        + messageId + "', will retry again after 5 seconds");
-                                
-                                // sleep for 5 seconds
-                                Thread.sleep(5000L);
-                                
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
+                final Page<SmsDeliveryReport> smsDeliveryReportPage = this.smsDeliveryReportRepository.findAll(new PageRequest(0, 5000));
+                
+                for (SmsDeliveryReport smsDeliveryReport : smsDeliveryReportPage) {
+                    this.processSmsDeliveryReport(smsDeliveryReport, 0);
                 }
                 
             } else {
                 this.smppSessionLifecycle.restartSmppSession();
+            }
+        }
+    }
+    
+    private void processSmsDeliveryReport(final SmsDeliveryReport smsDeliveryReport, 
+            Integer smsOutboundMessageRetrievalAttempts) {
+        final String messageId = smsDeliveryReport.getMessageId();
+        final SmsMessageStatusType statusType = SmsMessageStatusType.instance(smsDeliveryReport.getSmsDeliveryStatus());
+        
+        // get the SmsMessage object from the DB
+        final SmsOutboundMessage smsOutboundMessage = this.smsOutboundMessageRepository.findByExternalId(messageId);
+        
+        // increment the number of retrieval attempts
+        smsOutboundMessageRetrievalAttempts++;
+        
+        if(smsOutboundMessage != null) {
+            // update the status of the SMS message
+            smsOutboundMessage.setDeliveryStatus(statusType);
+            
+            switch(smsDeliveryReport.getSmsDeliveryStatus()) {
+                case DELIVERED:
+                    // update the delivery date of the SMS message
+                    smsOutboundMessage.setDeliveredOnDate(smsDeliveryReport.getDoneOnDate());
+                    break;
+                    
+                default:
+                    break;
+            }
+            
+            // save the "SmsOutboundMessage" entity
+            this.smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);
+            
+            logger.info("SMS message with external ID '" + messageId
+                    + "' successfully updated. Status set to: " + smsOutboundMessage.getDeliveryStatus().
+                    toString());
+            
+            // remove the delivery report from the queue
+            this.smsDeliveryReportRepository.delete(smsDeliveryReport);
+            
+        } else {
+            if (smsOutboundMessageRetrievalAttempts <= 3) {
+                try {
+                    // sleep for 5 seconds
+                    Thread.sleep(5000L);
+                    
+                    this.processSmsDeliveryReport(smsDeliveryReport, smsOutboundMessageRetrievalAttempts);
+                    
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                
+            } else {
+                // remove the delivery report from the queue
+                this.smsDeliveryReportRepository.delete(smsDeliveryReport);
             }
         }
     }
