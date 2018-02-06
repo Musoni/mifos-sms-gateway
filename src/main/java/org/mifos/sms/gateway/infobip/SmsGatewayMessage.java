@@ -1,5 +1,7 @@
 package org.mifos.sms.gateway.infobip;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
 /** 
  * Immutable data object representing a sms gateway message 
  **/
@@ -31,20 +33,44 @@ public class SmsGatewayMessage {
      **/
     private String message;
     
-    /** 
+    /**
+     * the number sms segments that was sent out
+     */
+    private Integer numberOfSegments;
+    
+    /**
      * SmsGatewayMessage constructor
      * 
-     * @param id the internal message identifier
-     * @param externalId the sms gateway message identifier
-     * @param mobileNumber the mobile number of sms message recipient
-     * @param message the sms message text
-     **/
-    public SmsGatewayMessage(Long id, String externalId, String sourceAddress, String mobileNumber, String message) {
+     * @param id
+     * @param externalId
+     * @param sourceAddress
+     * @param mobileNumber
+     * @param message
+     * @param numberOfSegments
+     */
+    public SmsGatewayMessage(Long id, String externalId, String sourceAddress, String mobileNumber, String message,
+            Integer numberOfSegments) {
         this.id = id;
-        this.mobileNumber = mobileNumber;
-        this.message = message;
         this.externalId = externalId;
         this.sourceAddress = sourceAddress;
+        this.mobileNumber = mobileNumber;
+        this.message = message;
+        this.numberOfSegments = numberOfSegments;
+    }
+    
+    /**
+     * Creates a new {@link SmsGatewayMessage} object
+     * 
+     * @param id
+     * @param externalId
+     * @param sourceAddress
+     * @param mobileNumber
+     * @param message
+     * @return {@link SmsGatewayMessage} object
+     */
+    public static SmsGatewayMessage getInstance(Long id, String externalId, String sourceAddress, 
+            String mobileNumber, String message) {
+        return new SmsGatewayMessage(id, externalId, sourceAddress, mobileNumber, message, null);
     }
 
     /**
@@ -75,13 +101,19 @@ public class SmsGatewayMessage {
         return externalId;
     }
     
-    @Override
+    /**
+     * @return the numberOfSegments
+     */
+    public Integer getNumberOfSegments() {
+        return numberOfSegments;
+    }
+
     /** 
      * @return String representation of the SmsGatewayMessage class
      **/
+    @Override
     public String toString() {
-        return "SmsGatewayDeliveryReport [id=" + id + ", externalId=" + externalId + ", sourceAddress" + sourceAddress +
-        		", mobileNumber=" + mobileNumber + ", message=" + message + "]";
+        return ToStringBuilder.reflectionToString(this);
     }
 
 	/**
@@ -90,4 +122,11 @@ public class SmsGatewayMessage {
 	public String getSourceAddress() {
 		return sourceAddress;
 	}
+
+    /**
+     * @param numberOfSegments the numberOfSegments to set
+     */
+    public void setNumberOfSegments(Integer numberOfSegments) {
+        this.numberOfSegments = numberOfSegments;
+    }
 }

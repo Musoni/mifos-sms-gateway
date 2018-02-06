@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.mifos.sms.data.ConfigurationData;
 import org.mifos.sms.domain.SmsDeliveryReport;
 import org.mifos.sms.domain.SmsDeliveryReportRepository;
@@ -82,7 +83,7 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		        if((smsOutboundMessages != null) && smsOutboundMessages.size() > 0) {
 		            
 		            for(SmsOutboundMessage smsOutboundMessage : smsOutboundMessages) {
-		                SmsGatewayMessage smsGatewayMessage = new SmsGatewayMessage(smsOutboundMessage.getId(), 
+		                SmsGatewayMessage smsGatewayMessage = SmsGatewayMessage.getInstance(smsOutboundMessage.getId(), 
 		                        smsOutboundMessage.getExternalId(), smsOutboundMessage.getSourceAddress(), 
 		                        smsOutboundMessage.getMobileNumber(), smsOutboundMessage.getMessage());
 		                
@@ -92,6 +93,9 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		                // update the "submittedOnDate" property of the SMS message in the DB
 		                smsOutboundMessage.setSubmittedOnDate(new Date());
 		                
+		                // update the number of segment property
+		                smsOutboundMessage.setNumberOfSegments(smsGatewayMessage.getNumberOfSegments());
+		                
 		                // check if the returned SmsGatewayMessage object has an external ID
 		                if(!StringUtils.isEmpty(smsGatewayMessage.getExternalId())) {
 		                    
@@ -99,11 +103,11 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
 		                    smsOutboundMessage.setExternalId(smsGatewayMessage.getExternalId());
 		                    
 		                    // update the status of the SMS message in the DB
-		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.SENT);
+		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.SENT.getValue());
 		                    
 		                } else {
 		                    // update the status of the SMS message in the DB
-		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.FAILED);
+		                    smsOutboundMessage.setDeliveryStatus(SmsMessageStatusType.FAILED.getValue());
 		                }
 		                
 		                smsOutboundMessageRepository.save(smsOutboundMessage);
@@ -254,7 +258,7 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
         
         if(smsOutboundMessage != null) {
             // update the status of the SMS message
-            smsOutboundMessage.setDeliveryStatus(statusType);
+            smsOutboundMessage.setDeliveryStatus(statusType.getValue());
             
             switch(smsDeliveryReport.getSmsDeliveryStatus()) {
                 case DELIVERED:
@@ -265,6 +269,9 @@ public class SmsOutboundMessageScheduledJobServiceImpl implements SmsOutboundMes
                 default:
                     break;
             }
+            
+            // update the sms error code id field
+            smsOutboundMessage.setSmsErrorCodeId(NumberUtils.toInt(smsDeliveryReport.getErrorCode(), 0));
             
             // save the "SmsOutboundMessage" entity
             this.smsOutboundMessageRepository.saveAndFlush(smsOutboundMessage);

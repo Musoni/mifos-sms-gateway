@@ -1,7 +1,9 @@
 package org.mifos.sms.data;
 
 import java.util.Date;
-import org.mifos.sms.data.EnumOptionData;
+
+import org.mifos.sms.domain.SmsMessageEnumerations;
+import org.mifos.sms.domain.SmsOutboundMessage;
 
 /** 
  * Immutable data object representing a SMS message
@@ -19,32 +21,44 @@ public class SmsOutboundMessageData {
 	private Date addedOnDate;
 	private Date deliveredOnDate;
 	private EnumOptionData deliveryStatus;
-	private String deliveryErrorMessage;
 	private String mobileNumber;
 	private String message;
+	private Integer numberOfSegments;
+	private Integer smsErrorCodeId;
 	
-	/** 
-	 * SmsOutboundMessageData constructor 
-	 * 
-	 * @return void
-	 **/
-	private SmsOutboundMessageData(final Long id, final String externalId, final Long internalId, final String mifosTenantIdentifier, 
-			final Date createdOnDate, final Date submittedOnDate, final Date addedOnDate, final Date deliveredOnDate, 
-			final EnumOptionData deliveryStatus, final String deliveryErrorMessage, final String mobileNumber, final String message) {
-		
-		this.id = id;
-		this.externalId = externalId;
-		this.internalId = internalId;
-		this.mifosTenantIdentifier = mifosTenantIdentifier;
-		this.createdOnDate = createdOnDate;
-		this.submittedOnDate = submittedOnDate;
-		this.addedOnDate = addedOnDate;
-		this.deliveredOnDate = deliveredOnDate;
-		this.deliveryStatus = deliveryStatus;
-		this.deliveryErrorMessage = deliveryErrorMessage;
-		this.mobileNumber = mobileNumber;
-		this.message = message;
-	}
+	/**
+     * @param id
+     * @param externalId
+     * @param internalId
+     * @param mifosTenantIdentifier
+     * @param createdOnDate
+     * @param submittedOnDate
+     * @param addedOnDate
+     * @param deliveredOnDate
+     * @param deliveryStatus
+     * @param mobileNumber
+     * @param message
+     * @param numberOfSegments
+     * @param smsErrorCodeId
+     */
+    private SmsOutboundMessageData(Long id, String externalId, Long internalId, String mifosTenantIdentifier,
+            Date createdOnDate, Date submittedOnDate, Date addedOnDate, Date deliveredOnDate,
+            EnumOptionData deliveryStatus, String mobileNumber, String message, Integer numberOfSegments,
+            Integer smsErrorCodeId) {
+        this.id = id;
+        this.externalId = externalId;
+        this.internalId = internalId;
+        this.mifosTenantIdentifier = mifosTenantIdentifier;
+        this.createdOnDate = createdOnDate;
+        this.submittedOnDate = submittedOnDate;
+        this.addedOnDate = addedOnDate;
+        this.deliveredOnDate = deliveredOnDate;
+        this.deliveryStatus = deliveryStatus;
+        this.mobileNumber = mobileNumber;
+        this.message = message;
+        this.numberOfSegments = numberOfSegments;
+        this.smsErrorCodeId = smsErrorCodeId;
+    }
 	
 	/** 
 	 * Default SmsOutboundMessageData constructor 
@@ -53,17 +67,21 @@ public class SmsOutboundMessageData {
 	 **/
 	protected SmsOutboundMessageData() {}
 	
-	/** 
-	 * get an instance of the SmsOutboundMessageData class
+	/**
+	 * Creates a new {@link SmsOutboundMessageData} object
 	 * 
-	 * @return SmsOutboundMessageData object
-	 **/
-	public static SmsOutboundMessageData getInstance(final Long id, final String externalId, final Long internalId, final String mifosTenantIdentifier, 
-			final Date createdOnDate, final Date submittedOnDate, final Date addedOnDate, final Date deliveredOnDate, 
-			final EnumOptionData deliveryStatus, final String deliveryErrorMessage, final String mobileNumber, final String message) {
-		
-		return new SmsOutboundMessageData(id, externalId, internalId, mifosTenantIdentifier, createdOnDate, submittedOnDate, addedOnDate, deliveredOnDate, 
-				deliveryStatus, deliveryErrorMessage, mobileNumber, message);
+	 * @param smsOutboundMessage
+	 * @return {@link SmsOutboundMessageData} object
+	 */
+	public static SmsOutboundMessageData getInstance(SmsOutboundMessage smsOutboundMessage) {
+	    final EnumOptionData deliveryStatus = SmsMessageEnumerations.status(smsOutboundMessage.getDeliveryStatus());
+	    
+	    return new SmsOutboundMessageData(smsOutboundMessage.getId(), smsOutboundMessage.getExternalId(), 
+	            smsOutboundMessage.getInternalId(), smsOutboundMessage.getMifosTenantIdentifier(), 
+	            smsOutboundMessage.getCreatedOnDate(), smsOutboundMessage.getSubmittedOnDate(), 
+	            smsOutboundMessage.getAddedOnDate(), smsOutboundMessage.getDeliveredOnDate(), 
+	            deliveryStatus, smsOutboundMessage.getMobileNumber(), smsOutboundMessage.getMessage(), 
+	            smsOutboundMessage.getNumberOfSegments(), smsOutboundMessage.getSmsErrorCodeId());
 	}
 
 	/**
@@ -130,13 +148,6 @@ public class SmsOutboundMessageData {
 	}
 	
 	/** 
-	 * @return the delivery error message 
-	 **/
-	public String getDeliveryErrorMessage() {
-		return deliveryErrorMessage;
-	}
-	
-	/** 
 	 * @return the mobile phone number 
 	 **/
 	public String getMobileNumber() {
@@ -149,4 +160,18 @@ public class SmsOutboundMessageData {
 	public String getMessage() {
 		return message;
 	}
+
+    /**
+     * @return the numberOfSegments
+     */
+    public Integer getNumberOfSegments() {
+        return numberOfSegments;
+    }
+
+    /**
+     * @return the smsErrorCodeId
+     */
+    public Integer getSmsErrorCodeId() {
+        return smsErrorCodeId;
+    }
 }

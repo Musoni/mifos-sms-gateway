@@ -8,8 +8,8 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.joda.time.LocalDate;
-import org.mifos.sms.data.EnumOptionData;
 import org.mifos.sms.data.SmsOutboundMessageData;
 import org.springframework.data.jpa.domain.AbstractPersistable;
 
@@ -52,9 +52,6 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	@Column(name = "deliveryStatus", nullable = false)
     private Integer deliveryStatus = SmsMessageStatusType.PENDING.getValue();
 	
-	@Column(name = "deliveryErrorMessage", nullable = true)
-    private String deliveryErrorMessage;
-	
 	@Column(name = "sourceAddress", nullable = false)
     private String sourceAddress;
 	
@@ -64,205 +61,206 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
 	@Column(name = "message", nullable = false)
     private String message;
 	
-	/** 
-	 * SmsOutboundMessage constructor
-	 * 
-	 * @return void 
-	 **/
-	private SmsOutboundMessage(final String externalId, final Long internalId, final String mifosTenantIdentifier, 
-			final Date createdOnDate, final Date submittedOnDate, final Date addedOnDate, final Date deliveredOnDate, 
-			final SmsMessageStatusType deliveryStatus, final String deliveryErrorMessage, final String sourceAddress,
-			final String mobileNumber, final String message) {
-		this.externalId = externalId;
-		this.internalId = internalId;
-		this.mifosTenantIdentifier = mifosTenantIdentifier;
-		this.createdOnDate = createdOnDate;
-		this.submittedOnDate = submittedOnDate;
-		this.addedOnDate = addedOnDate;
-		this.deliveredOnDate = deliveredOnDate;
-		this.deliveryStatus = deliveryStatus.getValue();
-		this.deliveryErrorMessage = deliveryErrorMessage;
-		this.sourceAddress = sourceAddress;
-		this.mobileNumber = mobileNumber;
-		this.message = message;
-	}
+	@Column(name = "numberOfSegments", nullable = true)
+	private Integer numberOfSegments;
 	
-	/** 
-	 * Default SmsOutboundMessage constructor
-	 * 
-	 * @return void
-	 **/
-	protected SmsOutboundMessage() {}
+	@Column(name = "smsErrorCodeId", nullable = true)
+	private Integer smsErrorCodeId;
 	
-	/** 
-	 * get messages with delivery status 100 
-	 * 
-	 * @return SmsOutboundMessage object
-	 **/
-	public static SmsOutboundMessage getPendingMessages(final String externalId, final Long internalId, final String mifosTenantIdentifier, 
-			final Date createdOnDate, final Date submittedOnDate, final Date addedOnDate, final Date deliveredOnDate, 
-			final String deliveryErrorMessage, final String sourceAddress, final String mobileNumber, final String message) {
-		
-		return new SmsOutboundMessage(externalId, internalId, mifosTenantIdentifier, createdOnDate, submittedOnDate, addedOnDate, 
-				deliveredOnDate, SmsMessageStatusType.PENDING, deliveryErrorMessage, sourceAddress, mobileNumber, message);
-	}
+	/**
+	 * no-args constructor
+	 */
+	protected SmsOutboundMessage() { }
 	
-	/**  
-	 * @return an instance of the SmsOutboundMessage class
-	 **/
-	public SmsOutboundMessage getInstance(final String externalId, final Long internalId, final String mifosTenantIdentifier, 
-			final Date createdOnDate, final Date submittedOnDate, final Date addedOnDate, final Date deliveredOnDate, final SmsMessageStatusType deliveryStatus, 
-			final String deliveryErrorMessage, final String sourceAddress, final String mobileNumber, final String message) {
-		
-		return new SmsOutboundMessage(externalId, internalId, mifosTenantIdentifier, createdOnDate, submittedOnDate, addedOnDate, 
-				deliveredOnDate, deliveryStatus, deliveryErrorMessage, sourceAddress, mobileNumber, message);
-	}
-	
-	/** 
-	 * @return the sms gateway message identifier 
-	 **/
-	public String getExternalId() {
-		return externalId;
-	}
-	
-	/** 
-	 * set the value of the sms gateway message identifier 
-	 **/
-	public void setExternalId(String externalId) {
-		this.externalId = externalId;
-	}
-	
-	/** 
-	 * @return the mifostenant sms message identifier 
-	 **/
-	public Long getInternalId() {
-		return internalId;
-	}
-	
-	/** 
-	 * @return the mifos tenant identifier, e.g. tugende 
-	 **/
-	public String getMifosTenantIdentifier() {
-		return mifosTenantIdentifier;
-	}
-	
-	/** 
-	 * @return the date the message was added to the mifostenant sms table 
-	 **/
-	public Date getCreatedOnDate() {
-		return createdOnDate;
-	}
-	
-	/** 
-	 * @return the date the message was submitted to the sms gateway 
-	 **/
-	public Date getSubmittedOnDate() {
-		return submittedOnDate;
-	}
-	
-	/** 
-	 * set the value of the date the message was submitted to the sms gateway
-	 **/
-	public void setSubmittedOnDate(Date submittedOnDate) {
-		this.submittedOnDate = submittedOnDate;
-	}
-	
-	/** 
-	 * @return the date the message was added to the local sms table 
-	 **/
-	public LocalDate getAddedOnDate() {
-		return new LocalDate(this.addedOnDate);
-	}
-	
-	/** 
-	 * set the value of the date the message was added to the local sms table
-	 **/
-	public void setAddedOnDate(Date addedOnDate) {
-		this.addedOnDate = addedOnDate;
-	}
-	
-	/** 
-	 * @return the date the message was delivered to the recipient phone 
-	 **/
-	public LocalDate getDeliveredOnDate() {
-	    return new LocalDate(this.deliveredOnDate);
-	}
-	
-	/** 
-	 * set the value of the date the message was delivered to the recipient phone 
-	 **/
-	public void setDeliveredOnDate(Date deliveredOnDate) {
-		this.deliveredOnDate = deliveredOnDate;
-	}
-	
-	/** 
-	 * @return the current delivery status 
-	 **/
-	public Integer getDeliveryStatus() {
-		return deliveryStatus;
-	}
-	
-	/** 
-     * Set the value of this.statusType
-     * 
-     * @param deliveryStatus message delivery status enum
-     * @return void
-     **/
-    public void setDeliveryStatus(SmsMessageStatusType deliveryStatus) {
-        if (deliveryStatus != null) {
-            this.deliveryStatus = deliveryStatus.getValue();
-        }
+	/**
+     * @return the externalId
+     */
+    public String getExternalId() {
+        return externalId;
     }
-	
-	/** 
-	 * @return the delivery error message 
-	 **/
-	public String getDeliveryErrorMessage() {
-		return deliveryErrorMessage;
-	}
-	
-	/** 
-	 * set the value of the delivery error message
-	 * 
-	 * @param deliveryErrorMessage the delivery error message
-	 * @return void
-	 **/
-	public void setDeliveryErrorMessage(String deliveryErrorMessage) {
-		this.deliveryErrorMessage = deliveryErrorMessage;
-	}
-	
-	/** 
-	 * @return the sms message recipient mobile number
-	 **/
-	public String getMobileNumber() {
-		return mobileNumber;
-	}
-	
-	/** 
-	 * @return the sender of the sms message
-	 **/
-	public String getSourceAddress() {
-		return sourceAddress;
-	}
-	
-	/** 
-	 * @return the sms message text 
-	 **/
-	public String getMessage() {
-		return message;
-	}
-	
-	/** 
+
+    /**
+     * @return the internalId
+     */
+    public Long getInternalId() {
+        return internalId;
+    }
+
+    /**
+     * @return the mifosTenantIdentifier
+     */
+    public String getMifosTenantIdentifier() {
+        return mifosTenantIdentifier;
+    }
+
+    /**
+     * @return the createdOnDate
+     */
+    public Date getCreatedOnDate() {
+        return createdOnDate;
+    }
+
+    /**
+     * @return the submittedOnDate
+     */
+    public Date getSubmittedOnDate() {
+        return submittedOnDate;
+    }
+
+    /**
+     * @return the addedOnDate
+     */
+    public Date getAddedOnDate() {
+        return addedOnDate;
+    }
+
+    /**
+     * @return the deliveredOnDate
+     */
+    public Date getDeliveredOnDate() {
+        return deliveredOnDate;
+    }
+
+    /**
+     * @return the deliveryStatus
+     */
+    public Integer getDeliveryStatus() {
+        return deliveryStatus;
+    }
+
+    /**
+     * @return the sourceAddress
+     */
+    public String getSourceAddress() {
+        return sourceAddress;
+    }
+
+    /**
+     * @return the mobileNumber
+     */
+    public String getMobileNumber() {
+        return mobileNumber;
+    }
+
+    /**
+     * @return the message
+     */
+    public String getMessage() {
+        return message;
+    }
+
+    /**
+     * @return the numberOfSegments
+     */
+    public Integer getNumberOfSegments() {
+        return numberOfSegments;
+    }
+
+    /**
+     * @return the smsErrorCodeId
+     */
+    public Integer getSmsErrorCodeId() {
+        return smsErrorCodeId;
+    }
+
+    /**
+     * @param externalId the externalId to set
+     */
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
+    }
+
+    /**
+     * @param internalId the internalId to set
+     */
+    public void setInternalId(Long internalId) {
+        this.internalId = internalId;
+    }
+
+    /**
+     * @param mifosTenantIdentifier the mifosTenantIdentifier to set
+     */
+    public void setMifosTenantIdentifier(String mifosTenantIdentifier) {
+        this.mifosTenantIdentifier = mifosTenantIdentifier;
+    }
+
+    /**
+     * @param createdOnDate the createdOnDate to set
+     */
+    public void setCreatedOnDate(Date createdOnDate) {
+        this.createdOnDate = createdOnDate;
+    }
+
+    /**
+     * @param submittedOnDate the submittedOnDate to set
+     */
+    public void setSubmittedOnDate(Date submittedOnDate) {
+        this.submittedOnDate = submittedOnDate;
+    }
+
+    /**
+     * @param addedOnDate the addedOnDate to set
+     */
+    public void setAddedOnDate(Date addedOnDate) {
+        this.addedOnDate = addedOnDate;
+    }
+
+    /**
+     * @param deliveredOnDate the deliveredOnDate to set
+     */
+    public void setDeliveredOnDate(Date deliveredOnDate) {
+        this.deliveredOnDate = deliveredOnDate;
+    }
+
+    /**
+     * @param deliveryStatus the deliveryStatus to set
+     */
+    public void setDeliveryStatus(Integer deliveryStatus) {
+        this.deliveryStatus = deliveryStatus;
+    }
+
+    /**
+     * @param sourceAddress the sourceAddress to set
+     */
+    public void setSourceAddress(String sourceAddress) {
+        this.sourceAddress = sourceAddress;
+    }
+
+    /**
+     * @param mobileNumber the mobileNumber to set
+     */
+    public void setMobileNumber(String mobileNumber) {
+        this.mobileNumber = mobileNumber;
+    }
+
+    /**
+     * @param message the message to set
+     */
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    /**
+     * @param numberOfSegments the numberOfSegments to set
+     */
+    public void setNumberOfSegments(Integer numberOfSegments) {
+        this.numberOfSegments = numberOfSegments;
+    }
+
+    /**
+     * @param smsErrorCodeId the smsErrorCodeId to set
+     */
+    public void setSmsErrorCodeId(Integer smsErrorCodeId) {
+        this.smsErrorCodeId = smsErrorCodeId;
+    }
+
+    /** 
 	 * convert SmsOutboundMessage to SmsOutboundMessageData
 	 * 
 	 * @return object of type SmsOutboundMessageData
 	 **/
 	public SmsOutboundMessageData toData() {
-	    final EnumOptionData deliveryStatus = SmsMessageEnumerations.status(this.deliveryStatus);
-	    
-	    return SmsOutboundMessageData.getInstance(this.getId(), this.externalId, this.internalId, this.mifosTenantIdentifier, this.createdOnDate, 
-	            this.submittedOnDate, this.addedOnDate, this.deliveredOnDate, deliveryStatus, this.deliveryErrorMessage, this.mobileNumber, 
-	            this.deliveryErrorMessage);
+	    return SmsOutboundMessageData.getInstance(this);
 	}
 
     /* (non-Javadoc)
@@ -270,11 +268,24 @@ public class SmsOutboundMessage extends AbstractPersistable<Long> {
      */
     @Override
     public String toString() {
-        return "SmsOutboundMessage [externalId=" + externalId + ", internalId=" + internalId
-                + ", mifosTenantIdentifier=" + mifosTenantIdentifier + ", createdOnDate=" + createdOnDate
-                + ", submittedOnDate=" + submittedOnDate + ", addedOnDate=" + addedOnDate + ", deliveredOnDate="
-                + deliveredOnDate + ", deliveryStatus=" + deliveryStatus + ", deliveryErrorMessage="
-                + deliveryErrorMessage + ", sourceAddress=" + sourceAddress + ", mobileNumber=" + mobileNumber
-                + ", message=" + message + "]";
+        return ToStringBuilder.reflectionToString(this);
+    }
+
+    /**
+     * Returns the addedOnDate as a {@link LocalDate} object
+     * 
+     * @return the addedOnDate as a {@link LocalDate} object
+     */
+    public LocalDate getAddedOnDateAsLocalDate() {
+        return (addedOnDate != null) ? new LocalDate(addedOnDate) : null;
+    }
+
+    /**
+     * Returns the deliveredOnDate as a {@link LocalDate} object
+     * 
+     * @return the deliveredOnDate as a {@link LocalDate} object
+     */
+    public LocalDate getDeliveredOnDateAsLocalDate() {
+        return (deliveredOnDate != null) ? new LocalDate(deliveredOnDate) : null;
     }
 }

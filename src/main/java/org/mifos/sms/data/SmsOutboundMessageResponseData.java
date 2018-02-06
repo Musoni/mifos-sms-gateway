@@ -14,14 +14,23 @@ public class SmsOutboundMessageResponseData {
 	private Integer deliveryStatus;
 	private Boolean hasError;
 	private String errorMessage;
+	private Integer smsErrorCodeId;
+	private Integer numberOfSegments;
 	
-	/** 
-	 * SmsOutboundMessageResponseData constructor
-	 * 
-	 * @return void 
-	 **/
+	/**
+	 * @param id
+	 * @param externalId
+	 * @param addedOnDate
+	 * @param deliveredOnDate
+	 * @param deliveryStatus
+	 * @param hasError
+	 * @param errorMessage
+	 * @param smsErrorCodeId
+	 * @param numberOfSegments
+	 */
 	private SmsOutboundMessageResponseData(Long id, Long externalId, String addedOnDate, String deliveredOnDate, 
-			Integer deliveryStatus, Boolean hasError, String errorMessage) {
+			Integer deliveryStatus, Boolean hasError, String errorMessage, Integer smsErrorCodeId, 
+			Integer numberOfSegments) {
 		this.id = id;
 		this.externalId = externalId;
 		this.addedOnDate = addedOnDate;
@@ -29,6 +38,8 @@ public class SmsOutboundMessageResponseData {
 		this.deliveryStatus = deliveryStatus;
 		this.hasError = hasError;
 		this.errorMessage = errorMessage;
+		this.smsErrorCodeId = smsErrorCodeId;
+		this.numberOfSegments = numberOfSegments;
 	}
 	
 	/** 
@@ -42,9 +53,10 @@ public class SmsOutboundMessageResponseData {
 	 * @return an instance of the SmsOutboundMessageResponseData class
 	 **/
 	public static SmsOutboundMessageResponseData getInstance(Long id, Long externalId, String addedOnDate, String deliveredOnDate, 
-			Integer deliveryStatus, Boolean hasError, String errorMessage) {
+			Integer deliveryStatus, Boolean hasError, String errorMessage, Integer smsErrorCodeId, Integer numberOfSegments) {
 		
-		return new SmsOutboundMessageResponseData(id, externalId, addedOnDate, deliveredOnDate, deliveryStatus, hasError, errorMessage);
+		return new SmsOutboundMessageResponseData(id, externalId, addedOnDate, deliveredOnDate, 
+		        deliveryStatus, hasError, errorMessage, smsErrorCodeId, numberOfSegments);
 	}
 
 	/**
@@ -95,4 +107,18 @@ public class SmsOutboundMessageResponseData {
 	public String getErrorMessage() {
 		return errorMessage;
 	}
+
+    /**
+     * @return the smsErrorCodeId
+     */
+    public Integer getSmsErrorCodeId() {
+        return smsErrorCodeId;
+    }
+
+    /**
+     * @return the numberOfSegments
+     */
+    public Integer getNumberOfSegments() {
+        return numberOfSegments;
+    }
 }

@@ -53,14 +53,17 @@ public class WriteSmsOutboundMessageServiceImpl implements WriteSmsOutboundMessa
 	                // add a response data object to the "SmsOutboundMessageResponseData" list
 	                smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
 	                        smsOutboundMessage.getId(), smsOutboundMessage.getAddedOnDate().toString(), null, 
-	                        smsOutboundMessage.getDeliveryStatus(), false, null));
+	                        smsOutboundMessage.getDeliveryStatus(), false, null, smsOutboundMessage.getSmsErrorCodeId(), 
+	                        smsOutboundMessage.getNumberOfSegments()));
 	            }
 	            
 	            else {
 	                // validation errors exist
 	                // add a response data object to the "SmsOutboundMessageResponseData" list
 	                smsOutboundMessagesResponseData.add(SmsOutboundMessageResponseData.getInstance(smsOutboundMessage.getInternalId(), 
-	                        smsOutboundMessage.getId(), null, null, null, true, "Missing value for one or more mandatory parameters"));
+	                        smsOutboundMessage.getId(), null, null, null, true, 
+	                        "Missing value for one or more mandatory parameters", smsOutboundMessage.getSmsErrorCodeId(), 
+                            smsOutboundMessage.getNumberOfSegments()));
 	            }
 	        }
 		}

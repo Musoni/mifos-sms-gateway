@@ -37,12 +37,13 @@ public class ReadSmsOutboundMessageServiceImpl implements ReadSmsOutboundMessage
 	            
 	            Long id = smsOutboundMessage.getInternalId();
 	            Long externalId = smsOutboundMessage.getId();
-	            LocalDate addedOnDate = smsOutboundMessage.getAddedOnDate();
-	            LocalDate deliveredOnDate = smsOutboundMessage.getDeliveredOnDate();
+	            LocalDate addedOnDate = smsOutboundMessage.getAddedOnDateAsLocalDate();
+	            LocalDate deliveredOnDate = smsOutboundMessage.getDeliveredOnDateAsLocalDate();
 	            Integer deliveryStatus = smsOutboundMessage.getDeliveryStatus();
 	            
 	            SmsOutboundMessageResponseData smsOutboundMessageResponseData = SmsOutboundMessageResponseData.getInstance(id, externalId, 
-	                    addedOnDate.toString(), deliveredOnDate.toString(), deliveryStatus, false, "");
+	                    addedOnDate.toString(), deliveredOnDate.toString(), deliveryStatus, false, "", 
+	                    smsOutboundMessage.getSmsErrorCodeId(), smsOutboundMessage.getNumberOfSegments());
 	            
 	            smsOutboundMessageResponseDataCollection.add(smsOutboundMessageResponseData);
 	        }

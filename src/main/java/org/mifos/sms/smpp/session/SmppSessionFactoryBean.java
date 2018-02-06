@@ -174,6 +174,9 @@ public class SmppSessionFactoryBean {
             
             // send short message to SMSC (short message service center)
             smsGatewayMessage = this.submitShortMessage(smsShortMessage);
+            
+            // only one segment was sent out
+            smsGatewayMessage.setNumberOfSegments(1);
         }
         
         return smsGatewayMessage;
@@ -243,7 +246,7 @@ public class SmppSessionFactoryBean {
             logger.error("IO error occur", e);
         }
         
-        return new SmsGatewayMessage(smsShortMessage.getMessageId(), messageId, 
+        return SmsGatewayMessage.getInstance(smsShortMessage.getMessageId(), messageId, 
                 smsShortMessage.getSourceAddress(), smsShortMessage.getDestinationAddress(), 
                 smsShortMessage.getShortMessage());
     }
@@ -321,6 +324,9 @@ public class SmppSessionFactoryBean {
                     // send short message to SMSC (short message service center)
                     smsGatewayMessage = this.submitShortMessage(smsShortMessage);
                 }
+                
+                // update the number of segments sent out
+                smsGatewayMessage.setNumberOfSegments(segmentedMessagesBytes.length);
             }
             
             catch (IOException e) {
